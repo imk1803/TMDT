@@ -1,0 +1,55 @@
+import type { Company } from "@/types/company";
+
+export const companies: Company[] = [
+  {
+    id: "c1",
+    name: "VietTech Solutions",
+    logoText: "VS",
+    location: "TP. Hồ Chí Minh",
+    industry: "Công nghệ",
+    employees: "200-500",
+    jobsOpen: 12,
+    tagline: "Xây dựng giải pháp tuyển dụng thông minh cho doanh nghiệp Việt.",
+  },
+  {
+    id: "c2",
+    name: "FinX Việt Nam",
+    logoText: "FX",
+    location: "Hà Nội",
+    industry: "Fintech",
+    employees: "100-200",
+    jobsOpen: 6,
+    tagline: "Kết nối tài chính và công nghệ, mở lối tương lai sự nghiệp.",
+  },
+  {
+    id: "c3",
+    name: "Creative Studio",
+    logoText: "CS",
+    location: "Đà Nẵng",
+    industry: "Thiết kế",
+    employees: "50-100",
+    jobsOpen: 4,
+    tagline: "Studio sáng tạo cho thương hiệu tuyển dụng hiện đại.",
+  },
+  {
+    id: "c4",
+    name: "AppWorks",
+    logoText: "AW",
+    location: "Remote",
+    industry: "Phát triển ứng dụng",
+    employees: "50-100",
+    jobsOpen: 5,
+    tagline: "Đội ngũ remote xây dựng ứng dụng tuyển dụng đa nền tảng.",
+  },
+  {
+    id: "c5",
+    name: "GrowUp Agency",
+    logoText: "GA",
+    location: "Hà Nội",
+    industry: "Marketing",
+    employees: "50-100",
+    jobsOpen: 7,
+    tagline: "Tăng trưởng thương hiệu tuyển dụng với chiến lược marketing thông minh.",
+  },
+];
+
