@@ -1,11 +1,12 @@
 'use client';
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, RefreshCw, Search, X } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { jobs as seedJobs } from "@/data/jobs";
+import { useToast } from "@/components/ui/Toast";
+import { createJob, deleteJob, fetchJobs, updateJob } from "@/services/jobs";
 import type { Job } from "@/types/job";
 
 interface JobFormState {
@@ -23,13 +24,33 @@ type JobSortField = "title" | "company" | "location" | "workMode";
 
 export default function AdminJobsPage() {
   const [q, setQ] = useState("");
-  const [jobs, setJobs] = useState<Job[]>(seedJobs);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Job | null>(null);
   const [viewing, setViewing] = useState<Job | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [sortBy, setSortBy] = useState<JobSortField>("title");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const { push } = useToast();
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const data = await fetchJobs();
+        if (!cancelled) setJobs(data);
+      } catch {
+        if (!cancelled) setJobs([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [form, setForm] = useState<JobFormState>({
     title: "",
@@ -111,58 +132,78 @@ export default function AdminJobsPage() {
     setIsModalOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.title.trim() || !form.companyName.trim()) {
-      alert("Vui lòng nhập đầy đủ tiêu đề và tên công ty.");
+      push({
+        title: "Missing required fields",
+        description: "Job title and company are required.",
+        variant: "error",
+      });
       return;
     }
 
-    if (editing) {
-      setJobs((prev) =>
-        prev.map((job) =>
-          job.id === editing.id
-            ? {
-                ...job,
-                title: form.title.trim(),
-                companyName: form.companyName.trim(),
-                location: form.location || job.location,
-                workMode: form.workMode as Job["workMode"],
-                type: form.type as Job["type"],
-              }
-            : job
-        )
-      );
-    } else {
-      const newJob: Job = {
-        id: String(Date.now()),
-        title: form.title.trim(),
-        companyId: "demo",
-        companyName: form.companyName.trim(),
-        location: form.location || "TP. Hồ Chí Minh",
-        salary: "Thoả thuận",
-        type: form.type as Job["type"],
-        workMode: form.workMode as Job["workMode"],
-        experienceLevel: "Junior",
-        tags: ["Demo"],
-        description: "Tin tuyển dụng demo được tạo từ trang Admin.",
-      };
-      setJobs((prev) => [newJob, ...prev]);
+    try {
+      if (editing) {
+        await updateJob(editing.id, {
+          title: form.title.trim(),
+          description: `Updated by admin: ${form.title.trim()}`,
+          budget: 0,
+          location: form.location || editing.location,
+          workMode: form.workMode,
+          experienceLevel: "Mid",
+        });
+      } else {
+        await createJob({
+          title: form.title.trim(),
+          description: `Created by admin: ${form.title.trim()}`,
+          budget: 0,
+          location: form.location || "Remote",
+          workMode: form.workMode,
+          experienceLevel: "Junior",
+        });
+      }
+      const data = await fetchJobs();
+      setJobs(data);
       setPage(1);
+      push({
+        title: editing ? "Job updated" : "Job created",
+        description: "Saved to database.",
+        variant: "success",
+      });
+      setIsModalOpen(false);
+    } catch (err: any) {
+      push({
+        title: "Action failed",
+        description: err?.message || "Không thể lưu dữ liệu.",
+        variant: "error",
+      });
     }
-
-    setIsModalOpen(false);
   };
 
-  const handleDelete = (job: Job) => {
+  const handleDelete = async (job: Job) => {
     if (!confirm(`Xoá tin tuyển dụng "${job.title}"?`)) return;
-    setJobs((prev) => prev.filter((j) => j.id !== job.id));
+    try {
+      await deleteJob(job.id);
+      setJobs((prev) => prev.filter((j) => j.id !== job.id));
+      push({
+        title: "Job deleted",
+        description: "Removed from database.",
+        variant: "info",
+      });
+    } catch (err: any) {
+      push({
+        title: "Delete failed",
+        description: err?.message || "Không thể xoá tin.",
+        variant: "error",
+      });
+    }
   };
 
   return (
     <div>
       <AdminPageHeader
         title="Quản lý việc làm"
-        subtitle="Tìm kiếm, quản lý danh sách tin đăng (demo – CRUD phía client, chưa lưu DB)."
+        subtitle="Tìm kiếm, quản lý danh sách tin đăng (đã kết nối API)."
         actions={
           <>
             <Button
@@ -170,9 +211,17 @@ export default function AdminJobsPage() {
               size="sm"
               className="gap-2"
               onClick={() => {
-                setJobs(seedJobs);
+                setLoading(true);
+                fetchJobs()
+                  .then((data) => setJobs(data))
+                  .finally(() => setLoading(false));
                 setPage(1);
                 setQ("");
+                push({
+                  title: "Jobs refreshed",
+                  description: "Reloaded from API.",
+                  variant: "info",
+                });
               }}
             >
               <RefreshCw className="h-4 w-4" />
@@ -234,7 +283,7 @@ export default function AdminJobsPage() {
             <div>
               Tìm thấy{" "}
               <span className="font-semibold text-slate-900">
-                {sorted.length}
+                {loading ? 0 : sorted.length}
               </span>{" "}
               tin · Trang {currentPage}/{totalPages}
             </div>
@@ -532,4 +581,8 @@ export default function AdminJobsPage() {
     </div>
   );
 }
+
+
+
+
 

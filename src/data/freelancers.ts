@@ -1,4 +1,4 @@
-import type { Freelancer } from "@/types/freelancer";
+﻿import type { Freelancer } from "@/types/freelancer";
 
 export const freelancerCategories = [
   "IT",
@@ -334,4 +334,3 @@ export const freelancers: Freelancer[] = [
     onTimeRate: 90,
   },
 ];
-

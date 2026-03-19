@@ -1,6 +1,4 @@
-'use client';
-
-'use client';
+﻿"use client";
 
 import type { ReactNode } from "react";
 import Link from "next/link";
@@ -14,8 +12,9 @@ import {
   Trophy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAdminAuth } from "@/components/admin/AdminAuthProvider";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Toast";
 
 const nav = [
   { href: "/admin", label: "Tổng quan", icon: LayoutDashboard },
@@ -26,7 +25,8 @@ const nav = [
 
 export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { logout } = useAdminAuth();
+  const { logout } = useAuth();
+  const { push } = useToast();
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-50 via-sky-50 to-cyan-50 text-slate-900">
@@ -71,13 +71,20 @@ export function AdminShell({ children }: { children: ReactNode }) {
               variant="ghost"
               fullWidth
               className="justify-start gap-2.5 text-slate-600 hover:bg-sky-50"
-              onClick={logout}
+              onClick={() => {
+                logout();
+                push({
+                  title: "Logged out",
+                  description: "Đã đăng xuất.",
+                  variant: "info",
+                });
+              }}
             >
               <LogOut className="h-4 w-4" />
               Đăng xuất
             </Button>
             <p className="mt-3 text-xs text-slate-500">
-              Chế độ demo: dữ liệu đang lấy từ `src/data/*`.
+              Dữ liệu đang lấy từ API backend.
             </p>
           </div>
         </aside>
@@ -109,4 +116,3 @@ export function AdminShell({ children }: { children: ReactNode }) {
     </div>
   );
 }
-

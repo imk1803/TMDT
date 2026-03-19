@@ -1,11 +1,17 @@
+﻿"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import { Briefcase, Building2, Trophy, Users } from "lucide-react";
 import Link from "next/link";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Button } from "@/components/ui/Button";
-import { jobs } from "@/data/jobs";
-import { companies } from "@/data/companies";
-import { freelancers } from "@/data/freelancers";
+import { fetchJobs } from "@/services/jobs";
+import { fetchCompanies } from "@/services/companies";
+import { fetchFreelancers } from "@/services/freelancers";
 import { getEligibleRanked } from "@/lib/ranking";
+import type { Job } from "@/types/job";
+import type { Company } from "@/types/company";
+import type { Freelancer } from "@/types/freelancer";
 
 function StatCard({
   label,
@@ -37,13 +43,48 @@ function StatCard({
 }
 
 export default function AdminDashboardPage() {
-  const eligible = getEligibleRanked(freelancers);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [freelancers, setFreelancers] = useState<Freelancer[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const [j, c, f] = await Promise.all([
+          fetchJobs(),
+          fetchCompanies(),
+          fetchFreelancers(),
+        ]);
+        if (!cancelled) {
+          setJobs(j);
+          setCompanies(c);
+          setFreelancers(f);
+        }
+      } catch {
+        if (!cancelled) {
+          setJobs([]);
+          setCompanies([]);
+          setFreelancers([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const eligible = useMemo(() => getEligibleRanked(freelancers), [freelancers]);
 
   return (
     <div>
       <AdminPageHeader
         title="Tổng quan"
-        subtitle="Dashboard quản trị (demo) — số liệu lấy từ dữ liệu mock."
+        subtitle="Dashboard quản trị (đã kết nối API)."
         actions={
           <>
             <Link href="/admin/jobs">
@@ -61,25 +102,25 @@ export default function AdminDashboardPage() {
       <div className="grid gap-4 lg:grid-cols-4">
         <StatCard
           label="Việc làm"
-          value={`${jobs.length}`}
-          hint="Tin đăng trong dataset"
+          value={`${loading ? 0 : jobs.length}`}
+          hint="Tin đăng trong hệ thống"
           icon={<Briefcase className="h-5 w-5" />}
         />
         <StatCard
           label="Công ty"
-          value={`${companies.length}`}
+          value={`${loading ? 0 : companies.length}`}
           hint="Doanh nghiệp nổi bật"
           icon={<Building2 className="h-5 w-5" />}
         />
         <StatCard
           label="Freelancers"
-          value={`${freelancers.length}`}
+          value={`${loading ? 0 : freelancers.length}`}
           hint="Hồ sơ freelancer"
           icon={<Users className="h-5 w-5" />}
         />
         <StatCard
           label="Đủ điều kiện BXH"
-          value={`${eligible.length}`}
+          value={`${loading ? 0 : eligible.length}`}
           hint="Theo tiêu chí trong lib/ranking"
           icon={<Trophy className="h-5 w-5" />}
         />
@@ -88,7 +129,7 @@ export default function AdminDashboardPage() {
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <div className="rounded-3xl border border-sky-100 bg-white p-5 shadow-sm shadow-sky-100">
           <p className="text-sm font-semibold text-slate-900">
-            Việc làm gần đây (demo)
+            Việc làm gần đây
           </p>
           <div className="mt-3 space-y-2">
             {jobs.slice(0, 5).map((job) => (
@@ -104,12 +145,17 @@ export default function AdminDashboardPage() {
                 </p>
               </div>
             ))}
+            {!loading && jobs.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                Chưa có dữ liệu việc làm.
+              </div>
+            )}
           </div>
         </div>
 
         <div className="rounded-3xl border border-sky-100 bg-white p-5 shadow-sm shadow-sky-100">
           <p className="text-sm font-semibold text-slate-900">
-            Top freelancers (demo)
+            Top freelancers
           </p>
           <div className="mt-3 space-y-2">
             {eligible.slice(0, 5).map((f) => (
@@ -130,7 +176,7 @@ export default function AdminDashboardPage() {
                 </p>
               </div>
             ))}
-            {eligible.length === 0 && (
+            {!loading && eligible.length === 0 && (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
                 Chưa có freelancer đủ điều kiện theo tiêu chí hiện tại.
               </div>
@@ -141,4 +187,3 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
-

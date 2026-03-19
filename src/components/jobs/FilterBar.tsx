@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { cn } from "@/lib/utils";
 import { SALARY_RANGES } from "@/data/jobs";
@@ -14,6 +14,7 @@ const jobTypeOptions = [
   { id: "Toàn thời gian", label: "Toàn thời gian" },
   { id: "Bán thời gian", label: "Bán thời gian" },
   { id: "Thực tập", label: "Thực tập" },
+  { id: "Freelance", label: "Freelance" },
   { id: "Remote", label: "Remote" },
 ];
 
@@ -63,4 +64,3 @@ export function FilterBar({
     </div>
   );
 }
-

@@ -1,4 +1,4 @@
-export type FreelancerCategory =
+﻿export type FreelancerCategory =
   | "IT"
   | "Kế toán"
   | "Thiết kế"
@@ -26,4 +26,3 @@ export interface Freelancer {
    */
   currentRank?: number;
 }
-

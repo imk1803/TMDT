@@ -1,4 +1,5 @@
-import { MapPin, Wallet, Briefcase, ArrowRight } from "lucide-react";
+﻿import { MapPin, Wallet, Briefcase, ArrowRight } from "lucide-react";
+import Link from "next/link";
 import type { Job } from "@/types/job";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
@@ -67,12 +68,13 @@ export function JobCard({ job }: JobCardProps) {
         <p className="text-[11px] text-slate-400 sm:text-xs">
           Ứng tuyển nhanh · Phản hồi trong 3 ngày
         </p>
-        <Button size="sm" className="gap-1.5">
-          <span>Ứng tuyển</span>
-          <ArrowRight className="h-3.5 w-3.5" />
-        </Button>
+        <Link href={`/jobs/${job.id}`}>
+          <Button size="sm" className="gap-1.5">
+            <span>Ứng tuyển</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Button>
+        </Link>
       </div>
     </article>
   );
 }
-

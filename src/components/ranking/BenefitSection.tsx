@@ -1,4 +1,4 @@
-import { Sparkles, Trophy } from "lucide-react";
+﻿import { Sparkles, Trophy } from "lucide-react";
 
 const benefits = [
   { label: "Top 1", value: "Miễn 10% phí hoa hồng", tone: "gold" },
@@ -71,4 +71,3 @@ export function BenefitSection() {
     </section>
   );
 }
-

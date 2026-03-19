@@ -1,4 +1,4 @@
-import type { Freelancer, FreelancerCategory } from "@/types/freelancer";
+﻿import type { Freelancer, FreelancerCategory } from "@/types/freelancer";
 
 export const RANKING_CRITERIA = {
   minCompletedJobs: 50,
@@ -14,7 +14,7 @@ export const RANKING_CRITERIA = {
  * - rating (0..5) nhân 20 để đưa về thang 0..100: 20%
  * - onTimeRate (0..100): 20%
  *
- * Công thức gợi ý (dễ giải thích khi bảo vệ đồ án):
+ * Công thức gợi ý:
  * score =
  * (completedJobs * 0.3) +
  * (totalIncome / 1_000_000 * 0.3) +
@@ -38,7 +38,7 @@ export function isEligibleForQuarterRanking(f: Freelancer): boolean {
   );
 }
 
-// Giữ alias để code cũ (nếu có) không bị lỗi, nhưng ưu tiên dùng isEligibleForQuarterRanking
+// Alias cũ để code cũ không bị lỗi, ưu tiên dùng isEligibleForQuarterRanking
 export const isEligibleForMonthlyRanking = isEligibleForQuarterRanking;
 
 export function withRankingScore(f: Freelancer): Freelancer {
@@ -58,7 +58,7 @@ export function sortByScoreDesc(list: Freelancer[]) {
     const sa = a.rankingScore ?? calculateRankingScore(a);
     const sb = b.rankingScore ?? calculateRankingScore(b);
     if (sb !== sa) return sb - sa;
-    // tie-breaker: rating, rồi onTime, rồi income, rồi completedJobs
+    // tie-breaker: rating -> onTime -> income -> completedJobs
     if (b.rating !== a.rating) return b.rating - a.rating;
     if (b.onTimeRate !== a.onTimeRate) return b.onTimeRate - a.onTimeRate;
     if (b.totalIncome !== a.totalIncome) return b.totalIncome - a.totalIncome;
@@ -107,7 +107,7 @@ export function getCommissionBenefitByOverallRank(rank: number): string {
   return "Không áp dụng ưu đãi";
 }
 
-// Alias cũ cho tương thích, nên dùng getCommissionBenefitByOverallRank
+// Alias cũ cho tương thích
 export const getCommissionBenefitByRank = getCommissionBenefitByOverallRank;
 
 export function getIndustryBadgeByCategoryRank(rank: number): string {
@@ -118,7 +118,7 @@ export function getIndustryBadgeByCategoryRank(rank: number): string {
 }
 
 export function getCurrentQuarterLabel(date = new Date()): string {
-  const month = date.getMonth(); // 0-11
+  const month = date.getMonth();
   const quarter = Math.floor(month / 3) + 1;
   const year = date.getFullYear();
   return `Quý ${quarter} - ${year}`;
@@ -212,5 +212,3 @@ export function getQuarterHighlights(list: Freelancer[]): QuarterHighlights {
 
   return { highestIncome, bestRating, bestOnTime, mostJobs };
 }
-
-

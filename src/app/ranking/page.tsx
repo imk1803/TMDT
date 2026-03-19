@@ -1,9 +1,9 @@
-'use client';
+﻿'use client';
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Container } from "@/components/ui/Container";
-import { freelancers } from "@/data/freelancers";
-import type { FreelancerCategory } from "@/types/freelancer";
+import { fetchFreelancers } from "@/services/freelancers";
+import type { Freelancer, FreelancerCategory } from "@/types/freelancer";
 import {
   getCategoryTopN,
   getCurrentQuarterLabel,
@@ -20,22 +20,42 @@ import { RankingCard } from "@/components/ranking/RankingCard";
 import { QuarterHighlightsSection } from "@/components/ranking/QuarterHighlights";
 
 export default function RankingPage() {
+  const [freelancers, setFreelancers] = useState<Freelancer[]>([]);
+  const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState<FreelancerCategory | "Tất cả">(
     "Tất cả"
   );
 
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const data = await fetchFreelancers();
+        if (!cancelled) setFreelancers(data);
+      } catch {
+        if (!cancelled) setFreelancers([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const quarterLabel = useMemo(() => getCurrentQuarterLabel(), []);
 
-  const overallTop = useMemo(() => getOverallTopN(freelancers, 10), []);
+  const overallTop = useMemo(() => getOverallTopN(freelancers, 10), [freelancers]);
   const highlights = useMemo(
     () => getQuarterHighlights(freelancers),
-    []
+    [freelancers]
   );
 
   const rankedList = useMemo(() => {
     if (category === "Tất cả") return overallTop;
     return getCategoryTopN(freelancers, category, 10);
-  }, [category, overallTop]);
+  }, [category, overallTop, freelancers]);
 
   const top3 = rankedList.slice(0, 3);
   const rest = rankedList.slice(3);
@@ -91,7 +111,13 @@ export default function RankingPage() {
             </div>
           </div>
 
-          {rankedList.length > 0 && (
+          {loading && (
+            <div className="rounded-3xl border border-dashed border-sky-200 bg-white p-6 text-center text-sm text-slate-600 shadow-sm sm:p-8 sm:text-base">
+              Đang tải dữ liệu...
+            </div>
+          )}
+
+          {!loading && rankedList.length > 0 && (
             <div className="grid gap-4 lg:grid-cols-3">
               {top3.map((f, idx) => (
                 <TopThreeCard
@@ -105,7 +131,7 @@ export default function RankingPage() {
           )}
 
           <div className="mt-5 grid gap-3 sm:mt-6">
-            {rest.map((f, idx) => (
+            {!loading && rest.map((f, idx) => (
               <RankingCard
                 key={f.id}
                 freelancer={f}
@@ -114,7 +140,7 @@ export default function RankingPage() {
               />
             ))}
 
-            {rankedList.length === 0 && (
+            {!loading && rankedList.length === 0 && (
               <div className="rounded-3xl border border-dashed border-sky-200 bg-white p-6 text-center text-sm text-slate-600 shadow-sm sm:p-8 sm:text-base">
                 <p className="font-semibold text-slate-900">
                   Chưa có freelancer đủ điều kiện trong nhóm này.
@@ -130,4 +156,3 @@ export default function RankingPage() {
     </div>
   );
 }
-

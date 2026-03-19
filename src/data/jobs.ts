@@ -1,4 +1,4 @@
-import type { Job } from "@/types/job";
+﻿import type { Job } from "@/types/job";
 
 export const JOB_LOCATIONS = [
   "Hà Nội",
@@ -139,4 +139,3 @@ export const jobs: Job[] = [
       "Tham gia vào quá trình phát triển giao diện và học hỏi từ team senior.",
   },
 ];
-

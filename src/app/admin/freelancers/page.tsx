@@ -1,17 +1,25 @@
-'use client';
+﻿"use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, RefreshCw, Trophy, X } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { freelancers as seedFreelancers } from "@/data/freelancers";
+import { useToast } from "@/components/ui/Toast";
 import { getEligibleRanked } from "@/lib/ranking";
 import type { Freelancer, FreelancerCategory } from "@/types/freelancer";
+import {
+  adminCreateFreelancer,
+  adminDeleteFreelancer,
+  adminFetchFreelancers,
+  adminUpdateFreelancer,
+} from "@/services/admin.freelancers";
 
 interface FreelancerFormState {
   id?: string;
   name: string;
+  email: string;
+  password: string;
   category: FreelancerCategory;
   completedJobs: string;
   totalIncome: string;
@@ -23,22 +31,43 @@ type FreelancerSortField = "rank" | "name" | "rating" | "income" | "jobs";
 
 export default function AdminFreelancersPage() {
   const [q, setQ] = useState("");
-  const [freelancers, setFreelancers] =
-    useState<Freelancer[]>(seedFreelancers);
+  const [freelancers, setFreelancers] = useState<Freelancer[]>([]);
+  const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Freelancer | null>(null);
   const [viewing, setViewing] = useState<Freelancer | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [sortBy, setSortBy] = useState<FreelancerSortField>("rank");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const { push } = useToast();
 
   const [form, setForm] = useState<FreelancerFormState>({
     name: "",
+    email: "",
+    password: "",
     category: "IT",
     completedJobs: "",
     totalIncome: "",
     rating: "",
     onTimeRate: "",
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const data = await adminFetchFreelancers();
+        if (!cancelled) setFreelancers(data);
+      } catch {
+        if (!cancelled) setFreelancers([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const ranked = useMemo(() => getEligibleRanked(freelancers), [freelancers]);
 
@@ -108,6 +137,8 @@ export default function AdminFreelancersPage() {
     setEditing(null);
     setForm({
       name: "",
+      email: "",
+      password: "",
       category: "IT",
       completedJobs: "",
       totalIncome: "",
@@ -122,6 +153,8 @@ export default function AdminFreelancersPage() {
     setForm({
       id: f.id,
       name: f.name,
+      email: "",
+      password: "",
       category: f.category,
       completedJobs: String(f.completedJobs),
       totalIncome: String(f.totalIncome),
@@ -131,10 +164,32 @@ export default function AdminFreelancersPage() {
     setIsModalOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name.trim()) {
-      alert("Vui lòng nhập tên freelancer.");
+      push({
+        title: "Missing required fields",
+        description: "Freelancer name is required.",
+        variant: "error",
+      });
       return;
+    }
+    if (!editing) {
+      if (!form.email.trim()) {
+        push({
+          title: "Missing required fields",
+          description: "Email là bắt buộc khi tạo freelancer.",
+          variant: "error",
+        });
+        return;
+      }
+      if (form.password.trim().length < 6) {
+        push({
+          title: "Mật khẩu chưa hợp lệ",
+          description: "Mật khẩu phải có ít nhất 6 ký tự.",
+          variant: "error",
+        });
+        return;
+      }
     }
 
     const completedJobs = Number.parseInt(form.completedJobs || "0", 10);
@@ -153,27 +208,70 @@ export default function AdminFreelancersPage() {
       onTimeRate: Number.isFinite(onTimeRate) ? onTimeRate : 0,
     };
 
-    if (editing) {
-      setFreelancers((prev) =>
-        prev.map((f) => (f.id === editing.id ? normalized : f))
-      );
-    } else {
-      setFreelancers((prev) => [normalized, ...prev]);
-    }
+    try {
+      if (editing) {
+        await adminUpdateFreelancer(editing.id, {
+          name: normalized.name,
+          title: normalized.category,
+          completedJobs: normalized.completedJobs,
+          totalIncome: normalized.totalIncome,
+          rating: normalized.rating,
+          onTimeRate: normalized.onTimeRate,
+        });
+      } else {
+        await adminCreateFreelancer({
+          name: normalized.name,
+          email: form.email.trim(),
+          password: form.password.trim(),
+          title: normalized.category,
+          completedJobs: normalized.completedJobs,
+          totalIncome: normalized.totalIncome,
+          rating: normalized.rating,
+          onTimeRate: normalized.onTimeRate,
+        });
+      }
 
-    setIsModalOpen(false);
+      const data = await adminFetchFreelancers();
+      setFreelancers(data);
+      push({
+        title: editing ? "Freelancer updated" : "Freelancer created",
+        description: "Saved to database.",
+        variant: "success",
+      });
+      setIsModalOpen(false);
+    } catch (err: any) {
+      push({
+        title: "Action failed",
+        description: err?.message || "Không thể lưu dữ liệu.",
+        variant: "error",
+      });
+    }
   };
 
-  const handleDelete = (f: Freelancer) => {
+  const handleDelete = async (f: Freelancer) => {
     if (!confirm(`Xoá freelancer "${f.name}"?`)) return;
-    setFreelancers((prev) => prev.filter((x) => x.id !== f.id));
+    try {
+      await adminDeleteFreelancer(f.id);
+      setFreelancers((prev) => prev.filter((x) => x.id !== f.id));
+      push({
+        title: "Freelancer deleted",
+        description: "Removed from database.",
+        variant: "info",
+      });
+    } catch (err: any) {
+      push({
+        title: "Delete failed",
+        description: err?.message || "Không thể xoá freelancer.",
+        variant: "error",
+      });
+    }
   };
 
   return (
     <div>
       <AdminPageHeader
         title="Quản lý xếp hạng freelancer"
-        subtitle="Danh sách đủ điều kiện theo tiêu chí quý (demo – CRUD phía client)."
+        subtitle="Danh sách đủ điều kiện theo tiêu chí quý (đã kết nối API)."
         actions={
           <>
             <Button
@@ -181,8 +279,16 @@ export default function AdminFreelancersPage() {
               size="sm"
               className="gap-2"
               onClick={() => {
-                setFreelancers(seedFreelancers);
+                setLoading(true);
+                adminFetchFreelancers()
+                  .then((data) => setFreelancers(data))
+                  .finally(() => setLoading(false));
                 setQ("");
+                push({
+                  title: "Freelancers refreshed",
+                  description: "Reloaded from API.",
+                  variant: "info",
+                });
               }}
             >
               <RefreshCw className="h-4 w-4" />
@@ -242,12 +348,12 @@ export default function AdminFreelancersPage() {
             <div>
               Đủ điều kiện:{" "}
               <span className="font-semibold text-slate-900">
-                {ranked.length}
+                {loading ? 0 : ranked.length}
               </span>
               {" · "}
               Tổng hiển thị:{" "}
               <span className="font-semibold text-slate-900">
-                {list.length}
+                {loading ? 0 : list.length}
               </span>
             </div>
           </div>
@@ -267,7 +373,7 @@ export default function AdminFreelancersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {list.map((f) => {
+              {!loading && list.map((f) => {
                 const rankedItem = rankedById.get(f.id);
                 return (
                   <tr key={f.id} className="bg-white hover:bg-sky-50/60">
@@ -282,8 +388,7 @@ export default function AdminFreelancersPage() {
                     <td className="px-4 py-3">
                       <p className="font-medium text-slate-900">{f.name}</p>
                       <p className="mt-1 text-xs text-slate-500">
-                        Jobs {f.completedJobs} · Thu nhập{" "}
-                        {Math.round(f.totalIncome / 1_000_000)}m
+                        Jobs {f.completedJobs} · Thu nhập {Math.round(f.totalIncome / 1_000_000)}m
                       </p>
                     </td>
                     <td className="hidden px-4 py-3 text-slate-700 md:table-cell">
@@ -330,13 +435,13 @@ export default function AdminFreelancersPage() {
                 );
               })}
 
-              {list.length === 0 && (
+              {!loading && list.length === 0 && (
                 <tr>
                   <td
                     colSpan={6}
                     className="px-4 py-10 text-center text-sm text-slate-500"
                   >
-                    Không có dữ liệu phù hợp với từ khóa hiện tại.
+                    Không có dữ liệu phù hợp với từ khoá hiện tại.
                   </td>
                 </tr>
               )}
@@ -358,7 +463,7 @@ export default function AdminFreelancersPage() {
                   </p>
                   {!viewing && (
                     <p className="text-xs text-slate-500">
-                      Nhập đủ số liệu để hệ thống có thể xếp hạng.
+                      Dữ liệu được lưu vào database (chỉ sửa được khi đã có freelancer).
                     </p>
                   )}
                 </div>
@@ -419,14 +524,6 @@ export default function AdminFreelancersPage() {
                       </p>
                     </div>
                   </div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase text-slate-500">
-                      Thứ hạng hiện tại
-                    </p>
-                    <p className="mt-0.5 text-sm text-slate-800">
-                      {rankedById.get(viewing.id)?.currentRank ?? "Chưa đủ điều kiện"}
-                    </p>
-                  </div>
                 </div>
               ) : (
                 <>
@@ -438,6 +535,27 @@ export default function AdminFreelancersPage() {
                         setForm((f) => ({ ...f, name: e.target.value }))
                       }
                     />
+                    {!editing && (
+                      <>
+                        <Input
+                          label="Email"
+                          value={form.email}
+                          onChange={(e) =>
+                            setForm((f) => ({ ...f, email: e.target.value }))
+                          }
+                          placeholder="VD: freelancer@gmail.com"
+                        />
+                        <Input
+                          label="Mật khẩu"
+                          type="password"
+                          value={form.password}
+                          onChange={(e) =>
+                            setForm((f) => ({ ...f, password: e.target.value }))
+                          }
+                          placeholder="Tối thiểu 6 ký tự"
+                        />
+                      </>
+                    )}
 
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="space-y-1.5">
@@ -534,4 +652,3 @@ export default function AdminFreelancersPage() {
     </div>
   );
 }
-

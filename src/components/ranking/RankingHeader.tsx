@@ -1,4 +1,4 @@
-import { Trophy } from "lucide-react";
+﻿import { Trophy } from "lucide-react";
 
 interface RankingHeaderProps {
   quarterLabel: string;
@@ -21,9 +21,9 @@ export function RankingHeader({ quarterLabel }: RankingHeaderProps) {
           </h1>
           <p className="max-w-2xl text-sm text-slate-600 sm:text-base">
             Bảng xếp hạng này tôn vinh những freelancer hoạt động hiệu quả trong
-            quý. Hệ thống đánh giá dựa trên số lượng công việc hoàn thành,
-            thu nhập, rating và tỷ lệ đúng hạn. Bảng xếp hạng được chia theo
-            ngành nghề để đảm bảo công bằng.
+            quý. Hệ thống đánh giá dựa trên số lượng công việc hoàn thành, thu
+            nhập, rating và tỷ lệ đúng hạn. Bảng xếp hạng được chia theo ngành
+            nghề để đảm bảo công bằng.
           </p>
         </div>
 
@@ -39,4 +39,3 @@ export function RankingHeader({ quarterLabel }: RankingHeaderProps) {
     </div>
   );
 }
-

@@ -1,4 +1,4 @@
-import Image from "next/image";
+﻿import Image from "next/image";
 import { Star, Timer } from "lucide-react";
 import type { Freelancer } from "@/types/freelancer";
 import {
@@ -146,4 +146,3 @@ export function RankingCard({
     </article>
   );
 }
-

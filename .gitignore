@@ -40,3 +40,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 Fast-Job/
+
+# backend artifacts
+backend/node_modules/
+backend/.next/
+backend/dev.log

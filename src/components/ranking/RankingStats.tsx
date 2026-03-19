@@ -1,4 +1,4 @@
-import { BarChart3, CheckCircle2, ShieldCheck, Star } from "lucide-react";
+﻿import { BarChart3, CheckCircle2, ShieldCheck, Star } from "lucide-react";
 import type { FreelancerCategory } from "@/types/freelancer";
 import type { Freelancer } from "@/types/freelancer";
 import { RANKING_CRITERIA, isEligibleForQuarterRanking } from "@/lib/ranking";
@@ -100,4 +100,3 @@ export function RankingStats({
     </section>
   );
 }
-

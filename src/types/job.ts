@@ -1,4 +1,4 @@
-export type JobType =
+﻿export type JobType =
   | "Toàn thời gian"
   | "Bán thời gian"
   | "Thực tập"
@@ -14,10 +14,10 @@ export interface Job {
   companyName: string;
   location: string;
   salary: string;
+  salaryValue?: number | null;
   type: JobType;
   workMode: WorkMode;
   experienceLevel: "Junior" | "Mid" | "Senior";
   tags: string[];
   description: string;
 }
-

@@ -1,4 +1,4 @@
-import { CheckCircle2, ClipboardList } from "lucide-react";
+﻿import { CheckCircle2, ClipboardList } from "lucide-react";
 import { RANKING_CRITERIA } from "@/lib/ranking";
 
 export function CriteriaSection() {
@@ -65,4 +65,3 @@ export function CriteriaSection() {
     </section>
   );
 }
-

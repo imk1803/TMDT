@@ -1,4 +1,4 @@
-import Image from "next/image";
+﻿import Image from "next/image";
 import { ArrowUpRight, Clock, DollarSign, Star, Timer } from "lucide-react";
 import type { QuarterHighlights } from "@/lib/ranking";
 
@@ -110,4 +110,3 @@ export function QuarterHighlightsSection({ data }: QuarterHighlightsProps) {
     </section>
   );
 }
-

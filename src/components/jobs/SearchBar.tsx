@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { Search, MapPin, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -83,4 +83,3 @@ export function SearchBar({
     </form>
   );
 }
-

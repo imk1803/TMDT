@@ -1,12 +1,32 @@
+﻿"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { ArrowRight, MapPin, Wallet } from "lucide-react";
 import { Container } from "@/components/ui/Container";
 import { SectionTitle } from "@/components/ui/SectionTitle";
 import { Button } from "@/components/ui/Button";
-import { jobs } from "@/data/jobs";
+import { fetchJobs } from "@/services/jobs";
+import type { Job } from "@/types/job";
 
 export function FeaturedJobs() {
-  const featured = jobs.slice(0, 4);
+  const [featured, setFeatured] = useState<Job[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const data = await fetchJobs();
+        if (!cancelled) setFeatured(data.slice(0, 4));
+      } catch {
+        if (!cancelled) setFeatured([]);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <section className="bg-sky-50/80 py-10 sm:py-12">
@@ -86,4 +106,3 @@ export function FeaturedJobs() {
     </section>
   );
 }
-

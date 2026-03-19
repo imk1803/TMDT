@@ -1,6 +1,7 @@
 export interface Company {
   id: string;
   name: string;
+  logoUrl?: string | null;
   logoText: string;
   location: string;
   industry: string;
@@ -8,4 +9,3 @@ export interface Company {
   jobsOpen: number;
   tagline: string;
 }
-

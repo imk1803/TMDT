@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { Filter } from "lucide-react";
 import type { FreelancerCategory } from "@/types/freelancer";
@@ -43,4 +43,3 @@ export function RankingFilters({ value, onChange }: RankingFiltersProps) {
     </div>
   );
 }
-

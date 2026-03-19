@@ -1,10 +1,30 @@
+﻿"use client";
+
 import { Building2, MapPin, Users } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Container } from "@/components/ui/Container";
 import { SectionTitle } from "@/components/ui/SectionTitle";
-import { companies } from "@/data/companies";
+import { fetchCompanies } from "@/services/companies";
+import type { Company } from "@/types/company";
 
 export function FeaturedCompanies() {
-  const featured = companies.slice(0, 4);
+  const [featured, setFeatured] = useState<Company[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const data = await fetchCompanies();
+        if (!cancelled) setFeatured(data.slice(0, 4));
+      } catch {
+        if (!cancelled) setFeatured([]);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <section className="bg-white py-10 sm:py-12">
@@ -51,4 +71,3 @@ export function FeaturedCompanies() {
     </section>
   );
 }
-

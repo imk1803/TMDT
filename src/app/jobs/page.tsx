@@ -1,49 +1,109 @@
-'use client';
+﻿"use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Container } from "@/components/ui/Container";
 import { SectionTitle } from "@/components/ui/SectionTitle";
+import { Button } from "@/components/ui/Button";
 import { SearchBar } from "@/components/jobs/SearchBar";
 import { FilterBar } from "@/components/jobs/FilterBar";
 import { JobCard } from "@/components/jobs/JobCard";
-import { jobs } from "@/data/jobs";
+import { fetchJobs } from "@/services/jobs";
+import type { Job } from "@/types/job";
+import { useToast } from "@/components/ui/Toast";
+import { useAuth } from "@/components/auth/AuthProvider";
+
+function normalizeText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}
+
+function toSalaryMillions(job: Job): number | null {
+  if (typeof job.salaryValue === "number") {
+    if (job.salaryValue >= 1_000_000) return job.salaryValue / 1_000_000;
+    return job.salaryValue;
+  }
+  const numeric = parseInt(job.salary.replace(/\D/g, ""), 10);
+  if (!Number.isFinite(numeric)) return null;
+  if (numeric >= 1_000_000) return numeric / 1_000_000;
+  return numeric;
+}
 
 export default function JobsPage() {
+  const { user } = useAuth();
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
   const [keyword, setKeyword] = useState("");
   const [location, setLocation] = useState("");
   const [workMode, setWorkMode] = useState("");
   const [jobType, setJobType] = useState("");
   const [salaryRange, setSalaryRange] = useState("all");
+  const [error, setError] = useState<string | null>(null);
+  const { push } = useToast();
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const data = await fetchJobs();
+        if (!cancelled) {
+          setJobs(data);
+          setError(null);
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setJobs([]);
+          const message = err?.message || "Không thể tải danh sách công việc.";
+          setError(message);
+          push({
+            title: "Không tải được công việc",
+            description: message,
+            variant: "error",
+          });
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [push]);
 
   const filteredJobs = useMemo(() => {
+    const kw = normalizeText(keyword.trim());
+    const locationFilter = normalizeText(location.trim());
+    const workModeFilter = normalizeText(workMode.trim());
+
     return jobs.filter((job) => {
-      const kw = keyword.trim().toLowerCase();
       if (kw) {
-        const text =
-          `${job.title} ${job.companyName} ${job.description} ${job.tags.join(
-            " "
-          )}`.toLowerCase();
+        const text = normalizeText(
+          `${job.title} ${job.companyName} ${job.description} ${job.tags.join(" ")}`
+        );
         if (!text.includes(kw)) return false;
       }
 
-      if (location && job.location !== location) return false;
-      if (workMode && job.workMode !== workMode) return false;
+      if (locationFilter && normalizeText(job.location) !== locationFilter) return false;
+      if (workModeFilter && normalizeText(job.workMode) !== workModeFilter) return false;
       if (jobType && job.type !== jobType) return false;
 
       if (salaryRange !== "all") {
-        const numeric = parseInt(job.salary.replace(/\D/g, ""), 10);
-        if (!Number.isFinite(numeric)) return true;
-        if (salaryRange === "under-15" && numeric >= 15) return false;
-        if (salaryRange === "15-25" && (numeric < 15 || numeric > 25))
+        const salaryMillions = toSalaryMillions(job);
+        if (salaryMillions === null) return true;
+        if (salaryRange === "under-15" && salaryMillions >= 15) return false;
+        if (salaryRange === "15-25" && (salaryMillions < 15 || salaryMillions > 25))
           return false;
-        if (salaryRange === "25-40" && (numeric < 25 || numeric > 40))
+        if (salaryRange === "25-40" && (salaryMillions < 25 || salaryMillions > 40))
           return false;
-        if (salaryRange === "over-40" && numeric <= 40) return false;
+        if (salaryRange === "over-40" && salaryMillions <= 40) return false;
       }
 
       return true;
     });
-  }, [jobType, keyword, location, salaryRange, workMode]);
+  }, [jobType, keyword, location, salaryRange, workMode, jobs]);
 
   const handleSearchChange = (
     field: "keyword" | "location" | "workMode",
@@ -65,6 +125,13 @@ export default function JobsPage() {
         <SectionTitle
           title="Tìm kiếm việc làm"
           subtitle="Lọc theo địa điểm, mức lương và hình thức làm việc để tìm được cơ hội phù hợp nhất."
+          actions={
+            user?.role === "CLIENT" ? (
+              <Link href="/jobs/new">
+                <Button size="sm">Đăng job mới</Button>
+              </Link>
+            ) : undefined
+          }
         />
 
         <SearchBar
@@ -94,14 +161,19 @@ export default function JobsPage() {
         </div>
 
         <div className="mt-4 grid gap-4 md:mt-5">
-          {filteredJobs.map((job) => (
+          {loading && (
+            <div className="rounded-2xl border border-dashed border-sky-200 bg-sky-50/60 p-6 text-center text-sm text-slate-500 sm:p-8 sm:text-base">
+              Đang tải dữ liệu...
+            </div>
+          )}
+          {!loading && filteredJobs.map((job) => (
             <JobCard key={job.id} job={job} />
           ))}
 
-          {filteredJobs.length === 0 && (
+          {!loading && filteredJobs.length === 0 && (
             <div className="rounded-2xl border border-dashed border-sky-200 bg-sky-50/60 p-6 text-center text-sm text-slate-500 sm:p-8 sm:text-base">
               <p className="font-medium text-slate-700">
-                Chưa tìm thấy việc làm phù hợp với bộ lọc hiện tại.
+                {error || "Chưa tìm thấy việc làm phù hợp với bộ lọc hiện tại."}
               </p>
               <p className="mt-1 text-sm text-slate-500">
                 Hãy thử xoá bớt điều kiện lọc hoặc tìm với từ khóa khác.
@@ -113,4 +185,3 @@ export default function JobsPage() {
     </div>
   );
 }
-
