@@ -2,9 +2,12 @@ import type { NextApiHandler, NextApiResponse } from "next";
 import { ZodError } from "zod";
 import { HttpError, sendError } from "../utils/http";
 import type { AuthedRequest } from "./auth";
+import { ensureLeaderboardCronStarted } from "../lib/leaderboard-cron";
 
 export function withErrorHandler(handler: NextApiHandler) {
   return async (req: AuthedRequest, res: NextApiResponse) => {
+    ensureLeaderboardCronStarted();
+
     res.setHeader("Access-Control-Allow-Origin", process.env.CORS_ORIGIN || "http://localhost:3000");
     res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");

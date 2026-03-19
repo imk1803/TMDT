@@ -2,77 +2,113 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import Image from "next/image";
 import { Container } from "@/components/ui/Container";
+import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { fetchMyContracts } from "@/services/contracts";
-import { ensureChatServerReady, getChatSocket } from "@/services/chat";
 import { useToast } from "@/components/ui/Toast";
+import { fetchMyContracts } from "@/services/contracts";
+import {
+  approveMilestone,
+  createMilestone,
+  fetchContractMilestones,
+  submitMilestone,
+  updateMilestone,
+  type Milestone,
+} from "@/services/milestones";
+import {
+  ensureChatServerReady,
+  getChatSocket,
+  disconnectChatSocket,
+} from "@/services/chat";
+import {
+  BadgeCheck,
+  Clock,
+  LoaderCircle,
+  Send,
+} from "lucide-react";
 
 interface ContractDetail {
   id: string;
-  jobId: string;
-  clientId: string;
-  freelancerId: string;
+  status: "ACTIVE" | "COMPLETED" | "CANCELLED";
   price: number | string;
-  status: string;
-  startedAt?: string;
-  completedAt?: string | null;
   dueAt?: string | null;
   job?: {
     id: string;
     title?: string | null;
     description?: string | null;
-    deadlineAt?: string | null;
-  } | null;
-  freelancer?: {
-    id: string;
-    name?: string | null;
-    email?: string | null;
-    avatarUrl?: string | null;
+    location?: string | null;
+    category?: string | null;
   } | null;
   client?: {
     id: string;
     name?: string | null;
     email?: string | null;
-    avatarUrl?: string | null;
     clientProfile?: {
-      companyLogoUrl?: string | null;
       companyName?: string | null;
     } | null;
+  } | null;
+  freelancer?: {
+    id: string;
+    name?: string | null;
+    email?: string | null;
   } | null;
 }
 
 interface ChatMessage {
   id: string;
   content: string;
-  senderId: string;
-  receiverId?: string;
-  readAt?: string | null;
   createdAt: string;
+  senderId: string;
   sender?: {
     id: string;
     name?: string | null;
+    email?: string | null;
+    avatarUrl?: string | null;
   } | null;
 }
 
+const statusMeta: Record<Milestone["status"], { label: string; className: string }> = {
+  PENDING: { label: "Chờ bắt đầu", className: "bg-slate-100 text-slate-600" },
+  IN_PROGRESS: { label: "Đang thực hiện", className: "bg-amber-100 text-amber-700" },
+  SUBMITTED: { label: "Đã gửi", className: "bg-sky-100 text-sky-700" },
+  APPROVED: { label: "Đã duyệt", className: "bg-emerald-100 text-emerald-700" },
+};
+
+function formatDateInput(value?: string | null) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
 export default function ContractDetailPage() {
+  const params = useParams();
   const router = useRouter();
-  const { id } = useParams();
   const { user, loading } = useAuth();
   const { push } = useToast();
+  const contractId = params?.id as string;
+
   const [contract, setContract] = useState<ContractDetail | null>(null);
   const [loadingData, setLoadingData] = useState(true);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState("");
-  const [sending, setSending] = useState(false);
-  const [chatConnected, setChatConnected] = useState(false);
-  const [partnerTyping, setPartnerTyping] = useState(false);
-  const [partnerOnline, setPartnerOnline] = useState(false);
-  const typingTimeoutRef = useRef<number | null>(null);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [milestoneLoading, setMilestoneLoading] = useState(false);
 
-  const contractId = useMemo(() => (Array.isArray(id) ? id[0] : id), [id]);
+  const [title, setTitle] = useState("");
+  const [amount, setAmount] = useState("");
+  const [dueDate, setDueDate] = useState("");
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editAmount, setEditAmount] = useState("");
+  const [editDueDate, setEditDueDate] = useState("");
+
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messageInput, setMessageInput] = useState("");
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
+  const [typingUserIds, setTypingUserIds] = useState<string[]>([]);
+  const typingTimeout = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const messageListRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -81,159 +117,332 @@ export default function ContractDetailPage() {
   }, [loading, user, router]);
 
   useEffect(() => {
-    if (!contractId) return;
+    if (!user || !contractId) return;
     let cancelled = false;
+
     async function load() {
       try {
+        setLoadingData(true);
         const res = await fetchMyContracts();
-        const found = res.contracts?.find((c: any) => c.id === contractId) || null;
-        if (!cancelled) setContract(found);
-      } catch {
-        if (!cancelled) setContract(null);
+        const found = (res.contracts || []).find((item: ContractDetail) => item.id === contractId);
+        if (!cancelled) {
+          setContract(found || null);
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          push({
+            title: "Không thể tải hợp đồng",
+            description: err?.message || "Vui lòng thử lại.",
+            variant: "error",
+          });
+        }
       } finally {
         if (!cancelled) setLoadingData(false);
       }
     }
+
     load();
     return () => {
       cancelled = true;
     };
-  }, [contractId]);
+  }, [contractId, push, user]);
 
   useEffect(() => {
-    const activeContractId = contract?.id;
-    if (!user || !activeContractId) return;
-    const currentUserId = user.id;
-    let active = true;
-    let mounted = true;
+    if (!user || !contractId) return;
+    let cancelled = false;
 
-    async function setupRealtime() {
-      await ensureChatServerReady();
-      if (!mounted) return;
-      const socket = getChatSocket();
-
-      const onConnect = () => {
-        if (!active) return;
-        setChatConnected(true);
-        socket.emit("chat:join", { contractId: activeContractId }, (res: any) => {
-          if (!active) return;
-          if (res?.ok) {
-            setMessages((res.messages || []) as ChatMessage[]);
-            const onlineUserIds = (res.onlineUserIds || []) as string[];
-            setPartnerOnline(
-              onlineUserIds.some((id) => id && id !== currentUserId)
-            );
-            socket.emit("chat:read", { contractId: activeContractId });
-          } else {
-            push({
-              title: "Không thể tải đoạn chat",
-              description: res?.error || "Vui lòng thử lại.",
-              variant: "error",
-            });
-          }
-        });
-      };
-
-      const onDisconnect = () => {
-        if (!active) return;
-        setChatConnected(false);
-      };
-
-      const onNewMessage = (message: ChatMessage) => {
-        if (!active) return;
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === message.id)) return prev;
-          return [...prev, message];
-        });
-        if (message.senderId !== currentUserId) {
-          socket.emit("chat:read", { contractId: activeContractId });
+    async function loadMilestones() {
+      try {
+        setMilestoneLoading(true);
+        const res = await fetchContractMilestones(contractId);
+        if (!cancelled) {
+          setMilestones(res.milestones || []);
         }
-      };
-
-      const onTyping = (payload: { contractId?: string; userId?: string; isTyping?: boolean }) => {
-        if (!active) return;
-        if (payload?.contractId !== activeContractId) return;
-        if (!payload?.userId || payload.userId === currentUserId) return;
-        setPartnerTyping(Boolean(payload.isTyping));
-      };
-
-      const onRead = (payload: { contractId?: string; readerId?: string; messageIds?: string[]; readAt?: string }) => {
-        if (!active) return;
-        if (payload?.contractId !== activeContractId) return;
-        if (!payload?.readerId || payload.readerId === currentUserId) return;
-        const ids = new Set(payload.messageIds || []);
-        if (ids.size === 0) return;
-        setMessages((prev) =>
-          prev.map((m) =>
-            ids.has(m.id) ? { ...m, readAt: payload.readAt || new Date().toISOString() } : m
-          )
-        );
-      };
-
-      const onPresence = (payload: { contractId?: string; onlineUserIds?: string[] }) => {
-        if (!active) return;
-        if (payload?.contractId !== activeContractId) return;
-        const ids = payload.onlineUserIds || [];
-        setPartnerOnline(ids.some((id) => id && id !== currentUserId));
-      };
-
-      socket.on("connect", onConnect);
-      socket.on("disconnect", onDisconnect);
-      socket.on("chat:new", onNewMessage);
-      socket.on("chat:typing", onTyping);
-      socket.on("chat:read", onRead);
-      socket.on("chat:presence", onPresence);
-
-      if (socket.connected) {
-        onConnect();
-      } else {
-        socket.connect();
+      } catch (err: any) {
+        if (!cancelled) {
+          setMilestones([]);
+          push({
+            title: "Không thể tải milestone",
+            description: err?.message || "Vui lòng thử lại.",
+            variant: "error",
+          });
+        }
+      } finally {
+        if (!cancelled) setMilestoneLoading(false);
       }
-
-      return () => {
-        active = false;
-        socket.off("connect", onConnect);
-        socket.off("disconnect", onDisconnect);
-        socket.off("chat:new", onNewMessage);
-        socket.off("chat:typing", onTyping);
-        socket.off("chat:read", onRead);
-        socket.off("chat:presence", onPresence);
-      };
     }
 
-    let cleanup: (() => void) | undefined;
-    setupRealtime().then((fn) => {
-      cleanup = fn;
-    });
-
+    loadMilestones();
     return () => {
-      mounted = false;
-      active = false;
-      if (typingTimeoutRef.current) {
-        window.clearTimeout(typingTimeoutRef.current);
-      }
-      cleanup?.();
+      cancelled = true;
     };
-  }, [contract?.id, push, user]);
+  }, [contractId, push, user]);
+
+  useEffect(() => {
+    if (!user || !contractId) return;
+    const currentUserId = user.id;
+    let socket: ReturnType<typeof getChatSocket> | null = null;
+    let cancelled = false;
+
+    async function init() {
+      await ensureChatServerReady();
+      if (cancelled) return;
+      socket = getChatSocket();
+      socket.emit("chat:join", { contractId }, (resp: any) => {
+        if (!resp?.ok) {
+          return;
+        }
+        setMessages(resp.messages || []);
+        setOnlineUserIds(resp.onlineUserIds || []);
+      });
+
+      socket.on("chat:new", (message: ChatMessage) => {
+        setMessages((prev) => [...prev, message]);
+      });
+
+      socket.on("chat:presence", (payload: { onlineUserIds: string[] }) => {
+        setOnlineUserIds(payload?.onlineUserIds || []);
+      });
+
+      socket.on("chat:typing", (payload: { userId: string; isTyping: boolean }) => {
+        const { userId, isTyping } = payload || {};
+        if (!userId || userId === currentUserId) return;
+        if (isTyping) {
+          setTypingUserIds((prev) => (prev.includes(userId) ? prev : [...prev, userId]));
+          if (typingTimeout.current[userId]) {
+            clearTimeout(typingTimeout.current[userId]);
+          }
+          typingTimeout.current[userId] = setTimeout(() => {
+            setTypingUserIds((prev) => prev.filter((id) => id !== userId));
+          }, 1500);
+        } else {
+          setTypingUserIds((prev) => prev.filter((id) => id !== userId));
+        }
+      });
+
+      socket.on("chat:read", () => {
+        // optional hook
+      });
+    }
+
+    init();
+    return () => {
+      cancelled = true;
+      if (socket) {
+        socket.off("chat:new");
+        socket.off("chat:presence");
+        socket.off("chat:typing");
+        socket.off("chat:read");
+      }
+      disconnectChatSocket();
+    };
+  }, [contractId, user]);
+
+  useEffect(() => {
+    if (!messageListRef.current) return;
+    messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
+  }, [messages]);
+
+  const isClient = user?.role === "CLIENT";
+  const isFreelancer = user?.role === "FREELANCER";
+
+  const partnerName = useMemo(() => {
+    if (!contract || !user) return "";
+    if (user.role === "CLIENT") {
+      return contract.freelancer?.name || contract.freelancer?.email || "Freelancer";
+    }
+    return (
+      contract.client?.clientProfile?.companyName ||
+      contract.client?.name ||
+      contract.client?.email ||
+      "Client"
+    );
+  }, [contract, user]);
+
+  const canEditMilestone = (milestone: Milestone) =>
+    isClient && (milestone.status === "PENDING" || milestone.status === "IN_PROGRESS");
+
+  async function handleCreateMilestone() {
+    if (!title.trim()) {
+      push({
+        title: "Thiếu tiêu đề",
+        description: "Vui lòng nhập tiêu đề milestone.",
+        variant: "error",
+      });
+      return;
+    }
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      push({
+        title: "Số tiền không hợp lệ",
+        description: "Vui lòng nhập ngân sách hợp lệ.",
+        variant: "error",
+      });
+      return;
+    }
+
+    try {
+      setMilestoneLoading(true);
+      await createMilestone({
+        contractId,
+        title: title.trim(),
+        amount: numericAmount,
+        dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
+      });
+      setTitle("");
+      setAmount("");
+      setDueDate("");
+      const res = await fetchContractMilestones(contractId);
+      setMilestones(res.milestones || []);
+      push({ title: "Đã tạo milestone", variant: "success" });
+    } catch (err: any) {
+      push({
+        title: "Không thể tạo milestone",
+        description: err?.message || "Vui lòng thử lại.",
+        variant: "error",
+      });
+    } finally {
+      setMilestoneLoading(false);
+    }
+  }
+
+  async function handleStartMilestone(milestone: Milestone) {
+    try {
+      setMilestoneLoading(true);
+      await updateMilestone(milestone.id, { status: "IN_PROGRESS" });
+      const res = await fetchContractMilestones(contractId);
+      setMilestones(res.milestones || []);
+      push({ title: "Đã cập nhật trạng thái", variant: "success" });
+    } catch (err: any) {
+      push({
+        title: "Không thể cập nhật",
+        description: err?.message || "Vui lòng thử lại.",
+        variant: "error",
+      });
+    } finally {
+      setMilestoneLoading(false);
+    }
+  }
+
+  async function handleSubmitMilestone(milestone: Milestone) {
+    try {
+      setMilestoneLoading(true);
+      await submitMilestone(milestone.id);
+      const res = await fetchContractMilestones(contractId);
+      setMilestones(res.milestones || []);
+      push({ title: "Đã gửi milestone", variant: "success" });
+    } catch (err: any) {
+      push({
+        title: "Không thể gửi milestone",
+        description: err?.message || "Vui lòng thử lại.",
+        variant: "error",
+      });
+    } finally {
+      setMilestoneLoading(false);
+    }
+  }
+
+  async function handleApproveMilestone(milestone: Milestone) {
+    try {
+      setMilestoneLoading(true);
+      await approveMilestone(milestone.id);
+      const res = await fetchContractMilestones(contractId);
+      setMilestones(res.milestones || []);
+      push({ title: "Đã duyệt milestone", variant: "success" });
+    } catch (err: any) {
+      push({
+        title: "Không thể duyệt milestone",
+        description: err?.message || "Vui lòng thử lại.",
+        variant: "error",
+      });
+    } finally {
+      setMilestoneLoading(false);
+    }
+  }
+
+  async function handleSaveEdit(milestone: Milestone) {
+    if (!editTitle.trim() || editTitle.trim().length < 3) {
+      push({
+        title: "Tiêu đề không hợp lệ",
+        description: "Vui lòng nhập tiêu đề milestone (tối thiểu 3 ký tự).",
+        variant: "error",
+      });
+      return;
+    }
+    const numericAmount = Number(editAmount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      push({
+        title: "Số tiền không hợp lệ",
+        description: "Vui lòng nhập ngân sách hợp lệ.",
+        variant: "error",
+      });
+      return;
+    }
+    try {
+      setMilestoneLoading(true);
+      await updateMilestone(milestone.id, {
+        title: editTitle.trim(),
+        amount: numericAmount,
+        dueDate: editDueDate ? new Date(editDueDate).toISOString() : undefined,
+      });
+      const res = await fetchContractMilestones(contractId);
+      setMilestones(res.milestones || []);
+      setEditingId(null);
+      push({ title: "Đã cập nhật milestone", variant: "success" });
+    } catch (err: any) {
+      push({
+        title: "Không thể cập nhật milestone",
+        description: err?.message || "Vui lòng thử lại.",
+        variant: "error",
+      });
+    } finally {
+      setMilestoneLoading(false);
+    }
+  }
 
   async function handleSendMessage() {
-    const content = chatInput.trim();
-    if (!content || !contract?.id) return;
+    const content = messageInput.trim();
+    if (!content) return;
     const socket = getChatSocket();
-    setSending(true);
-    socket.emit("chat:send", { contractId: contract.id, content }, (res: any) => {
-      setSending(false);
-      if (!res?.ok) {
-        push({
-          title: "Không thể gửi tin nhắn",
-          description: res?.error || "Vui lòng thử lại.",
-          variant: "error",
-        });
-        return;
-      }
-      setChatInput("");
-      socket.emit("chat:typing", { contractId: contract.id, isTyping: false });
-    });
+    try {
+      setSendingMessage(true);
+      socket.emit(
+        "chat:send",
+        { contractId, content },
+        (resp: { ok: boolean; error?: string; message?: ChatMessage }) => {
+          if (!resp?.ok) {
+            push({
+              title: "Không thể gửi tin nhắn",
+              description: resp?.error || "Vui lòng thử lại.",
+              variant: "error",
+            });
+            setSendingMessage(false);
+            return;
+          }
+          setMessageInput("");
+          setSendingMessage(false);
+        }
+      );
+    } catch (err: any) {
+      setSendingMessage(false);
+      push({
+        title: "Không thể gửi tin nhắn",
+        description: err?.message || "Vui lòng thử lại.",
+        variant: "error",
+      });
+    }
+  }
+
+  function handleTyping(isTyping: boolean) {
+    const socket = getChatSocket();
+    socket.emit("chat:typing", { contractId, isTyping });
+  }
+
+  function scrollToMilestoneForm() {
+    const target = document.getElementById("milestone-form");
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
 
   if (loading || loadingData) {
@@ -248,12 +457,14 @@ export default function ContractDetailPage() {
     );
   }
 
+  if (!user) return null;
+
   if (!contract) {
     return (
       <div className="py-6 sm:py-8">
         <Container>
-          <div className="rounded-3xl border border-dashed border-sky-200 bg-white p-6 text-center text-sm text-slate-600 shadow-sm sm:p-8 sm:text-base">
-            Không tìm thấy hợp đồng.
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-600 shadow-sm sm:p-8 sm:text-base">
+            Không tìm thấy hợp đồng này.
           </div>
         </Container>
       </div>
@@ -263,218 +474,368 @@ export default function ContractDetailPage() {
   return (
     <div className="py-6 sm:py-8">
       <Container>
-        <div className="rounded-3xl border border-sky-100 bg-white p-6 shadow-sm shadow-sky-100">
-          <h1 className="text-xl font-semibold text-slate-900">Chi tiết hợp đồng</h1>
-
-          <div className="mt-4 grid gap-3 text-sm text-slate-700">
-            <div><span className="font-semibold">Mã hợp đồng:</span> {contract.id}</div>
-            <div><span className="font-semibold">Trạng thái:</span> {contract.status}</div>
-            <div><span className="font-semibold">Giá trị:</span> {Number(contract.price).toLocaleString("vi-VN")} VNĐ</div>
-            {contract.dueAt && (
-              <div><span className="font-semibold">Deadline:</span> {new Date(contract.dueAt).toLocaleDateString("vi-VN")}</div>
-            )}
-          </div>
-
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
-              <p className="text-sm font-semibold text-slate-900">Thông tin job</p>
-              <div className="mt-2 text-sm text-slate-700">
-                <p>
-                  <span className="font-semibold">Tiêu đề:</span>{" "}
-                  <Link href={`/jobs/${contract.jobId}`} className="text-sky-700 hover:underline">
-                    {contract.job?.title || contract.jobId}
-                  </Link>
-                </p>
-                {contract.job?.description && (
-                  <p className="mt-1 text-slate-600">{contract.job.description}</p>
-                )}
-                {contract.job?.deadlineAt && (
-                  <p className="mt-2"><span className="font-semibold">Deadline job:</span> {new Date(contract.job.deadlineAt).toLocaleDateString("vi-VN")}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
-              <p className="text-sm font-semibold text-slate-900">Freelancer</p>
-              <div className="mt-3 flex items-center gap-3">
-                <div className="relative h-12 w-12 overflow-hidden rounded-2xl ring-2 ring-sky-100">
-                  <Image
-                    src={contract.freelancer?.avatarUrl || "https://i.pravatar.cc/150?img=1"}
-                    alt={contract.freelancer?.name || "Freelancer"}
-                    fill
-                    className="object-cover"
-                    sizes="48px"
-                  />
-                </div>
-                <div className="text-sm text-slate-700">
-                  <p>
-                    <span className="font-semibold">Tên:</span>{" "}
-                    <Link href={`/freelancers/${contract.freelancerId}`} className="text-sky-700 hover:underline">
-                      {contract.freelancer?.name || contract.freelancerId}
-                    </Link>
+        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="space-y-6">
+            <div className="rounded-3xl border border-sky-100 bg-white p-6 shadow-sm shadow-sky-100">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.24em] text-sky-600">
+                    Hợp đồng
                   </p>
-                  {contract.freelancer?.email && (
-                    <p><span className="font-semibold">Email:</span> {contract.freelancer.email}</p>
+                  <h1 className="mt-2 text-2xl font-semibold text-slate-900">
+                    {contract.job?.title || "Hợp đồng"}
+                  </h1>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Đối tác: {partnerName}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  <p>
+                    Giá trị: {Number(contract.price).toLocaleString("vi-VN")} VNĐ
+                  </p>
+                  {contract.dueAt && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      Deadline: {new Date(contract.dueAt).toLocaleDateString("vi-VN")}
+                    </p>
                   )}
                 </div>
               </div>
+              {contract.job?.description && (
+                <p className="mt-4 text-sm text-slate-600">{contract.job.description}</p>
+              )}
             </div>
-          </div>
 
-          <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
-            <p className="text-sm font-semibold text-slate-900">Client</p>
-            <div className="mt-3 flex items-center gap-3">
-              <div className="relative h-12 w-12 overflow-hidden rounded-2xl ring-2 ring-sky-100">
-                <Image
-                  src={
-                    contract.client?.clientProfile?.companyLogoUrl ||
-                    contract.client?.avatarUrl ||
-                    "https://i.pravatar.cc/150?img=8"
-                  }
-                  alt={contract.client?.clientProfile?.companyName || contract.client?.name || "Client"}
-                  fill
-                  className="object-cover"
-                  sizes="48px"
-                />
+            <div className="rounded-3xl border border-sky-100 bg-white p-6 shadow-sm shadow-sky-100">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Milestone</h2>
+                  <p className="text-sm text-slate-500">
+                    Theo dõi tiến độ và thanh toán theo giai đoạn.
+                  </p>
+                </div>
+                {isClient && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      setTitle("");
+                      setAmount("");
+                      setDueDate("");
+                    }}
+                  >
+                    Làm mới
+                  </Button>
+                )}
               </div>
-              <div className="text-sm text-slate-700">
-                <p>
-                  <span className="font-semibold">Tên:</span>{" "}
-                  <Link href={`/clients/${contract.clientId}`} className="text-sky-700 hover:underline">
-                    {contract.client?.clientProfile?.companyName || contract.client?.name || contract.clientId}
-                  </Link>
-                </p>
-                {contract.client?.email && (
-                  <p><span className="font-semibold">Email:</span> {contract.client.email}</p>
+
+              {isClient && (
+                <div
+                  id="milestone-form"
+                  className="mt-4 grid gap-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-4 sm:grid-cols-[1.4fr_0.7fr_0.7fr_auto]"
+                >
+                  <input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Tên milestone"
+                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-sky-300"
+                  />
+                  <input
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="Số tiền"
+                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-sky-300"
+                  />
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-sky-300"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleCreateMilestone}
+                    disabled={milestoneLoading}
+                  >
+                    Tạo
+                  </Button>
+                </div>
+              )}
+
+              <div className="mt-5 space-y-3">
+                {milestones.map((milestone) => {
+                  const meta = statusMeta[milestone.status];
+                  const isEditing = editingId === milestone.id;
+
+                  return (
+                    <div
+                      key={milestone.id}
+                      className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{milestone.title}</p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Số tiền: {Number(milestone.amount).toLocaleString("vi-VN")} VNĐ
+                          </p>
+                          {milestone.dueDate && (
+                            <p className="mt-1 text-xs text-slate-500">
+                              Hạn: {new Date(milestone.dueDate).toLocaleDateString("vi-VN")}
+                            </p>
+                          )}
+                        </div>
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-medium ${meta.className}`}
+                        >
+                          {meta.label}
+                        </span>
+                      </div>
+
+                      {isEditing && (
+                        <div className="mt-3 grid gap-3 sm:grid-cols-[1.2fr_0.7fr_0.7fr_auto]">
+                          <input
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            placeholder="Tiêu đề"
+                            className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-sky-300"
+                          />
+                          <input
+                            value={editAmount}
+                            onChange={(e) => setEditAmount(e.target.value)}
+                            placeholder="Số tiền"
+                            className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-sky-300"
+                          />
+                          <input
+                            type="date"
+                            value={editDueDate}
+                            onChange={(e) => setEditDueDate(e.target.value)}
+                            className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-sky-300"
+                          />
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleSaveEdit(milestone)}
+                              disabled={milestoneLoading}
+                            >
+                              Lưu
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => setEditingId(null)}
+                            >
+                              Hủy
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {isClient && milestone.status === "PENDING" && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleStartMilestone(milestone)}
+                            disabled={milestoneLoading}
+                          >
+                            Bắt đầu
+                          </Button>
+                        )}
+                        {isFreelancer && milestone.status === "IN_PROGRESS" && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleSubmitMilestone(milestone)}
+                            disabled={milestoneLoading}
+                          >
+                            Gửi milestone
+                          </Button>
+                        )}
+                        {isClient && milestone.status === "SUBMITTED" && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleApproveMilestone(milestone)}
+                            disabled={milestoneLoading}
+                          >
+                            Duyệt
+                          </Button>
+                        )}
+                        {canEditMilestone(milestone) && !isEditing && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setEditingId(milestone.id);
+                              setEditTitle(milestone.title);
+                              setEditAmount(String(milestone.amount));
+                              setEditDueDate(formatDateInput(milestone.dueDate));
+                            }}
+                          >
+                            Chỉnh sửa
+                          </Button>
+                        )}
+                        {milestone.status === "APPROVED" && (
+                          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                            Đã thanh toán (demo)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {!milestoneLoading && milestones.length === 0 && (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500">
+                    Chưa có milestone nào.
+                  </div>
                 )}
               </div>
             </div>
           </div>
 
-          <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-emerald-800">Khu vực bắt đầu làm việc</p>
-                <p className="mt-1 text-sm text-emerald-700">
-                  Contract đã tạo, client và freelancer có thể bắt đầu phối hợp triển khai công việc ngay.
-                </p>
-                <p className="mt-1 text-xs text-emerald-700">
-                  Hợp đồng: <span className="font-semibold">{contract.id}</span>
-                </p>
+          <div className="space-y-6">
+            <div className="rounded-3xl border border-sky-100 bg-white p-6 shadow-sm shadow-sky-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">
+                    Xem trước các giai đoạn
+                  </h2>
+                  <p className="text-sm text-slate-500">
+                    Tổng hợp milestone để dễ theo dõi tiến độ.
+                  </p>
+                </div>
+                {isClient && (
+                  <Button size="sm" variant="secondary" onClick={scrollToMilestoneForm}>
+                    Thêm giai đoạn
+                  </Button>
+                )}
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Link
-                  href={`/jobs/${contract.jobId}`}
-                  className="rounded-full border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
-                >
-                  Xem lại công việc
-                </Link>
-                <Link
-                  href={user?.role === "CLIENT" ? `/freelancers/${contract.freelancerId}` : `/clients/${contract.clientId}`}
-                  className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
-                >
-                  Mở hồ sơ đối tác
-                </Link>
-              </div>
-            </div>
-          </div>
 
-          <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50/40 p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-slate-900">Chat theo hợp đồng</p>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                    partnerOnline
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-slate-200 text-slate-600"
-                  }`}
-                >
-                  {partnerOnline ? "Đối tác online" : "Đối tác offline"}
-                </span>
-                <span
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                    chatConnected
-                      ? "bg-sky-100 text-sky-700"
-                      : "bg-slate-200 text-slate-600"
-                  }`}
-                >
-                  {chatConnected ? "Socket OK" : "Socket lỗi"}
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-3 max-h-72 space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3">
-              {messages.map((message) => {
-                const own = message.senderId === user?.id;
-                return (
-                  <div
-                    key={message.id}
-                    className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
-                      own
-                        ? "ml-auto bg-sky-600 text-white"
-                        : "bg-slate-100 text-slate-800"
-                    }`}
-                  >
-                    {!own && (
-                      <p className="text-[11px] font-semibold text-slate-600">
-                        {message.sender?.name || "Đối tác"}
+              <div className="mt-4 space-y-3">
+                {milestones.map((milestone) => {
+                  const meta = statusMeta[milestone.status];
+                  return (
+                    <div
+                      key={milestone.id}
+                      className="rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-[0_10px_30px_rgba(148,163,184,0.12)]"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3">
+                          <span
+                            className={`mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${meta.className}`}
+                          >
+                            {milestone.status === "PENDING" && <Clock className="h-4 w-4" />}
+                            {milestone.status === "IN_PROGRESS" && (
+                              <LoaderCircle className="h-4 w-4 animate-spin" />
+                            )}
+                            {milestone.status === "SUBMITTED" && <Send className="h-4 w-4" />}
+                            {milestone.status === "APPROVED" && <BadgeCheck className="h-4 w-4" />}
+                          </span>
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900 leading-6">
+                              {milestone.title}
+                            </p>
+                            {milestone.dueDate && (
+                              <p className="mt-1 text-xs leading-5 text-slate-500">
+                                Hạn: {new Date(milestone.dueDate).toLocaleDateString("vi-VN")}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-sm font-semibold text-sky-600">
+                          {Number(milestone.amount).toLocaleString("vi-VN")} VNĐ
+                        </span>
+                      </div>
+                      <div className="mt-3 h-px w-full bg-slate-100" />
+                      <p className="mt-2 text-xs font-medium text-slate-500">
+                        Trạng thái: <span className="text-slate-700">{meta.label}</span>
                       </p>
-                    )}
-                    <p>{message.content}</p>
-                    <p className={`mt-1 text-[10px] ${own ? "text-sky-100" : "text-slate-500"}`}>
-                      {new Date(message.createdAt).toLocaleString("vi-VN")}
-                    </p>
-                    {own && message.readAt && (
-                      <p className="mt-0.5 text-[10px] text-sky-100">Đã xem</p>
-                    )}
-                  </div>
-                );
-              })}
+                    </div>
+                  );
+                })}
 
-              {messages.length === 0 && (
-                <p className="text-center text-xs text-slate-500">
-                  Chưa có tin nhắn nào. Hãy bắt đầu trao đổi công việc.
-                </p>
+                {milestones.length === 0 && (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500">
+                    Chưa có giai đoạn nào.
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="rounded-3xl border border-sky-100 bg-white p-6 shadow-sm shadow-sky-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Chat hợp đồng</h2>
+                  <p className="text-xs text-slate-500">
+                    Đang online: {onlineUserIds.length}
+                  </p>
+                </div>
+              </div>
+
+              <div
+                ref={messageListRef}
+                className="mt-4 max-h-[360px] space-y-3 overflow-y-auto rounded-2xl border border-slate-100 bg-slate-50/70 p-4"
+              >
+                {messages.length === 0 && (
+                  <p className="text-center text-sm text-slate-400">Chưa có tin nhắn.</p>
+                )}
+                {messages.map((message) => {
+                  const isMine = message.senderId === user.id;
+                  return (
+                    <div
+                      key={message.id}
+                      className={`flex ${isMine ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
+                          isMine
+                            ? "bg-sky-500 text-white"
+                            : "bg-white text-slate-700 border border-slate-100"
+                        }`}
+                      >
+                        <p className="font-medium">
+                          {isMine ? "Bạn" : message.sender?.name || message.sender?.email || "Đối tác"}
+                        </p>
+                        <p className="mt-1 whitespace-pre-wrap text-sm">{message.content}</p>
+                        <p className="mt-1 text-[11px] opacity-70">
+                          {new Date(message.createdAt).toLocaleTimeString("vi-VN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {typingUserIds.length > 0 && (
+                <p className="mt-2 text-xs text-slate-500">Đối tác đang nhập...</p>
               )}
-              {partnerTyping && (
-                <p className="text-xs text-slate-500">Đối tác đang nhập...</p>
-              )}
+
+              <div className="mt-3 flex gap-2">
+                <input
+                  value={messageInput}
+                  onChange={(e) => setMessageInput(e.target.value)}
+                  onFocus={() => handleTyping(true)}
+                  onBlur={() => handleTyping(false)}
+                  placeholder="Nhập tin nhắn..."
+                  className="h-10 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-sky-300"
+                />
+                <Button
+                  size="sm"
+                  onClick={handleSendMessage}
+                  disabled={sendingMessage}
+                >
+                  Gửi
+                </Button>
+              </div>
             </div>
 
-            <div className="mt-3 flex gap-2">
-              <input
-                value={chatInput}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setChatInput(value);
-                  if (!contract?.id) return;
-                  const socket = getChatSocket();
-                  socket.emit("chat:typing", { contractId: contract.id, isTyping: value.trim().length > 0 });
-                  if (typingTimeoutRef.current) {
-                    window.clearTimeout(typingTimeoutRef.current);
-                  }
-                  typingTimeoutRef.current = window.setTimeout(() => {
-                    socket.emit("chat:typing", { contractId: contract.id, isTyping: false });
-                  }, 1200);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    void handleSendMessage();
-                  }
-                }}
-                placeholder="Nhập tin nhắn..."
-                className="flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
-              />
-              <button
-                type="button"
-                onClick={() => void handleSendMessage()}
-                disabled={sending || !chatConnected || !chatInput.trim()}
-                className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {sending ? "Đang gửi..." : "Gửi"}
-              </button>
+            <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm shadow-slate-100">
+              <h3 className="text-sm font-semibold text-slate-900">Thông tin hợp đồng</h3>
+              <div className="mt-3 space-y-2 text-sm text-slate-600">
+                <p>Trạng thái: {contract.status}</p>
+                {contract.job?.category && <p>Lĩnh vực: {contract.job.category}</p>}
+                {contract.job?.location && <p>Địa điểm: {contract.job.location}</p>}
+              </div>
             </div>
           </div>
         </div>

@@ -1,4 +1,5 @@
-﻿import { prisma } from "../lib/prisma";
+import { prisma } from "../lib/prisma";
+import { awardPoints } from "./gamification.service";
 import { createNotification } from "./notification.service";
 
 async function recomputeFreelancerMetrics(freelancerId: string) {
@@ -26,11 +27,14 @@ async function recomputeFreelancerMetrics(freelancerId: string) {
   });
 }
 
-export async function createContract(clientId: string, data: {
-  proposalId?: string;
-  price?: number;
-  dueAt?: string;
-}) {
+export async function createContract(
+  clientId: string,
+  data: {
+    proposalId?: string;
+    price?: number;
+    dueAt?: string;
+  }
+) {
   if (!data.proposalId) {
     throw new Error("Proposal id is required");
   }
@@ -109,6 +113,22 @@ export async function createContract(clientId: string, data: {
       },
     });
 
+    const jobMilestones = await tx.jobMilestone.findMany({
+      where: { jobId: proposal.jobId },
+      orderBy: { createdAt: "asc" },
+    });
+    if (jobMilestones.length > 0) {
+      await tx.milestone.createMany({
+        data: jobMilestones.map((milestone) => ({
+          contractId: contract.id,
+          title: milestone.title,
+          amount: milestone.amount,
+          dueDate: milestone.dueDate ?? undefined,
+          status: "PENDING",
+        })),
+      });
+    }
+
     return {
       contract,
       jobId: proposal.jobId,
@@ -181,6 +201,7 @@ export async function completeContract(contractId: string) {
   });
 
   await recomputeFreelancerMetrics(contract.freelancerId);
+  await awardPoints(contract.freelancerId, 100, "job_complete");
   return contract;
 }
 
@@ -199,4 +220,3 @@ export async function cancelContract(contractId: string) {
     return updated;
   });
 }
-

@@ -20,6 +20,14 @@ function normalizeText(value: string) {
     .replace(/\p{Diacritic}/gu, "");
 }
 
+function normalizeLocation(value: string) {
+  return normalizeText(value)
+    .replace(/^tp\.?\s*/g, "")
+    .replace(/^thanh pho\s+/g, "")
+    .replace(/^tinh\s+/g, "")
+    .trim();
+}
+
 function toSalaryMillions(job: Job): number | null {
   if (typeof job.salaryValue === "number") {
     if (job.salaryValue >= 1_000_000) return job.salaryValue / 1_000_000;
@@ -38,7 +46,7 @@ export default function JobsPage() {
   const [keyword, setKeyword] = useState("");
   const [location, setLocation] = useState("");
   const [workMode, setWorkMode] = useState("");
-  const [jobType, setJobType] = useState("");
+  const [category, setCategory] = useState("");
   const [salaryRange, setSalaryRange] = useState("all");
   const [error, setError] = useState<string | null>(null);
   const { push } = useToast();
@@ -75,20 +83,23 @@ export default function JobsPage() {
 
   const filteredJobs = useMemo(() => {
     const kw = normalizeText(keyword.trim());
-    const locationFilter = normalizeText(location.trim());
+    const locationFilter = normalizeLocation(location.trim());
     const workModeFilter = normalizeText(workMode.trim());
 
     return jobs.filter((job) => {
       if (kw) {
         const text = normalizeText(
-          `${job.title} ${job.companyName} ${job.description} ${job.tags.join(" ")}`
+          `${job.title} ${job.companyName} ${job.description} ${job.tags.join(" ")} ${
+            job.categoryName || ""
+          }`
         );
         if (!text.includes(kw)) return false;
       }
 
-      if (locationFilter && normalizeText(job.location) !== locationFilter) return false;
+      if (locationFilter && normalizeLocation(job.location) !== locationFilter) return false;
       if (workModeFilter && normalizeText(job.workMode) !== workModeFilter) return false;
-      if (jobType && job.type !== jobType) return false;
+      if (category && normalizeText(job.categoryName || "") !== normalizeText(category))
+        return false;
 
       if (salaryRange !== "all") {
         const salaryMillions = toSalaryMillions(job);
@@ -103,7 +114,7 @@ export default function JobsPage() {
 
       return true;
     });
-  }, [jobType, keyword, location, salaryRange, workMode, jobs]);
+  }, [category, keyword, location, salaryRange, workMode, jobs]);
 
   const handleSearchChange = (
     field: "keyword" | "location" | "workMode",
@@ -114,8 +125,8 @@ export default function JobsPage() {
     if (field === "workMode") setWorkMode(value);
   };
 
-  const handleFilterChange = (field: "jobType" | "salaryRange", value: string) => {
-    if (field === "jobType") setJobType(value);
+  const handleFilterChange = (field: "category" | "salaryRange", value: string) => {
+    if (field === "category") setCategory(value);
     if (field === "salaryRange") setSalaryRange(value);
   };
 
@@ -145,7 +156,7 @@ export default function JobsPage() {
         />
 
         <FilterBar
-          jobType={jobType}
+          category={category}
           salaryRange={salaryRange}
           onChange={handleFilterChange}
         />

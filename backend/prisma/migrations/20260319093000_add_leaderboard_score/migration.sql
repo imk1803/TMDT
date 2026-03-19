@@ -1,0 +1,2 @@
+ALTER TABLE "FreelancerProfile"
+ADD COLUMN "leaderboard_score" DOUBLE PRECISION NOT NULL DEFAULT 0;

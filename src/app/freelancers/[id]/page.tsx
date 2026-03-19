@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import Image from "next/image";
 import { Container } from "@/components/ui/Container";
 import { apiFetch } from "@/services/api";
+import { CategoryIcon } from "@/components/categories/CategoryIcon";
+import { getCategoryBadge } from "@/lib/categoryBadge";
 
 interface FreelancerDetail {
   id: string;
@@ -19,6 +21,7 @@ interface FreelancerDetail {
     completedJobs?: number | null;
     totalIncome?: number | string | null;
     onTimeRate?: number | null;
+    categories?: { category?: { name?: string | null } }[] | null;
   } | null;
 }
 
@@ -79,6 +82,9 @@ export default function FreelancerDetailPage() {
   }
 
   const profile = freelancer.freelancerProfile || {};
+  const profileCategories =
+    profile.categories?.map((c) => c.category?.name).filter((x): x is string => Boolean(x)) ||
+    [];
 
   return (
     <div className="py-6 sm:py-8">
@@ -106,6 +112,23 @@ export default function FreelancerDetailPage() {
           {profile.bio && (
             <div className="mt-4 text-sm text-slate-600">
               {profile.bio}
+            </div>
+          )}
+
+          {profileCategories.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {profileCategories.map((name) => {
+                const badge = getCategoryBadge(name);
+                return (
+                  <span
+                    key={name}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${badge.className}`}
+                  >
+                    <CategoryIcon name={badge.icon} className="h-3.5 w-3.5" />
+                    {name}
+                  </span>
+                );
+              })}
             </div>
           )}
 

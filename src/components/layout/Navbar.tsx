@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, Briefcase, ChevronDown, LogIn, Menu, UserCircle, UserPlus, X } from "lucide-react";
+import { Bell, Briefcase, ChevronDown, LogIn, Menu, PlusCircle, UserCircle, UserPlus, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
@@ -17,6 +17,7 @@ import {
   markNotificationRead,
   resolveNotificationHref,
 } from "@/services/notifications";
+import { fetchMyWallet } from "@/services/wallet";
 
 function formatTime(value: string) {
   try {
@@ -35,6 +36,7 @@ export function Navbar() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [recentNotifications, setRecentNotifications] = useState<AppNotification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number>(0);
 
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const notificationMenuRef = useRef<HTMLDivElement | null>(null);
@@ -71,6 +73,19 @@ export function Navbar() {
     setUnreadCount(items.filter((n) => !n.readAt).length);
   }, []);
 
+  const loadWallet = useCallback(async () => {
+    if (!user || user.role === "ADMIN") {
+      setWalletBalance(0);
+      return;
+    }
+    try {
+      const res = await fetchMyWallet();
+      setWalletBalance(Number(res.wallet?.availableBalance ?? 0));
+    } catch {
+      // silent in navbar
+    }
+  }, [user]);
+
   const loadNotifications = useCallback(async () => {
     if (!user || user.role === "ADMIN") {
       setUnreadCount(0);
@@ -81,7 +96,7 @@ export function Navbar() {
       const res = await fetchMyNotifications();
       applyNotifications(res.notifications || []);
     } catch {
-      // Keep silent in navbar background refresh.
+      // silent in navbar background refresh
     }
   }, [applyNotifications, user]);
 
@@ -102,9 +117,7 @@ export function Navbar() {
         const data = JSON.parse(event.data || "{}");
         if (typeof data.unreadCount === "number") {
           setUnreadCount(data.unreadCount);
-          if (notificationMenuOpen) {
-            loadNotifications();
-          }
+          if (notificationMenuOpen) loadNotifications();
         }
       } catch {
         // ignore invalid stream payload
@@ -113,9 +126,7 @@ export function Navbar() {
     es?.addEventListener("unread_count", onUnreadCount as EventListener);
 
     const onVisible = () => {
-      if (document.visibilityState === "visible") {
-        loadNotifications();
-      }
+      if (document.visibilityState === "visible") loadNotifications();
     };
     const onFocus = () => loadNotifications();
     const onNotificationsUpdated = (event: Event) => {
@@ -140,6 +151,32 @@ export function Navbar() {
     };
   }, [canShowNotifications, loadNotifications, notificationMenuOpen]);
 
+  useEffect(() => {
+    if (!mounted || !user || user.role === "ADMIN") {
+      setWalletBalance(0);
+      return;
+    }
+    loadWallet();
+  }, [loadWallet, mounted, user]);
+
+  useEffect(() => {
+    if (!mounted || !user || user.role === "ADMIN") return;
+
+    const onWalletUpdated = (event: Event) => {
+      const custom = event as CustomEvent<{ availableBalance?: number }>;
+      if (typeof custom.detail?.availableBalance === "number") {
+        setWalletBalance(custom.detail.availableBalance);
+        return;
+      }
+      loadWallet();
+    };
+
+    window.addEventListener("wallet:updated", onWalletUpdated as EventListener);
+    return () => {
+      window.removeEventListener("wallet:updated", onWalletUpdated as EventListener);
+    };
+  }, [loadWallet, mounted, user]);
+
   const navItems = [
     { href: "/", label: "Trang chủ" },
     { href: "/jobs", label: "Tìm việc" },
@@ -154,6 +191,7 @@ export function Navbar() {
       ? [
           { href: "/notifications", label: "Thông báo" },
           { href: "/profile", label: "Hồ sơ" },
+          { href: "/wallet", label: "Ví của tôi" },
           { href: "/contracts", label: "Hợp đồng đang thực hiện" },
           { href: "/jobs/my", label: "Tin tuyển dụng của tôi" },
         ]
@@ -161,6 +199,7 @@ export function Navbar() {
       ? [
           { href: "/notifications", label: "Thông báo" },
           { href: "/profile", label: "Hồ sơ" },
+          { href: "/wallet", label: "Ví của tôi" },
           { href: "/contracts", label: "Hợp đồng đang thực hiện" },
           { href: "/proposals/my", label: "Đề xuất của tôi" },
         ]
@@ -186,9 +225,7 @@ export function Navbar() {
 
     if (!item.readAt) {
       setRecentNotifications((prev) =>
-        prev.map((n) =>
-          n.id === item.id ? { ...n, readAt: n.readAt || new Date().toISOString() } : n
-        )
+        prev.map((n) => (n.id === item.id ? { ...n, readAt: n.readAt || new Date().toISOString() } : n))
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
       try {
@@ -310,9 +347,7 @@ export function Navbar() {
                               onClick={() => handleNotificationClick(item)}
                               className={cn(
                                 "mb-1 block w-full rounded-xl border px-3 py-2.5 text-left transition-colors hover:bg-sky-50",
-                                item.readAt
-                                  ? "border-slate-100 bg-white"
-                                  : "border-sky-200 bg-sky-50/60"
+                                item.readAt ? "border-slate-100 bg-white" : "border-sky-200 bg-sky-50/60"
                               )}
                             >
                               <p className="text-sm font-medium text-slate-900">{item.title}</p>
@@ -344,7 +379,11 @@ export function Navbar() {
                 <button
                   type="button"
                   onClick={() => {
-                    setUserMenuOpen((v) => !v);
+                    setUserMenuOpen((v) => {
+                      const next = !v;
+                      if (next) loadWallet();
+                      return next;
+                    });
                     setNotificationMenuOpen(false);
                   }}
                   className="inline-flex items-center gap-2 rounded-full border border-sky-100 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm hover:border-sky-200 hover:bg-sky-50"
@@ -356,6 +395,23 @@ export function Navbar() {
 
                 {userMenuOpen && (
                   <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-sky-100 bg-white p-2 shadow-lg shadow-sky-100">
+                    {user.role !== "ADMIN" && (
+                      <div className="mb-2 rounded-xl border border-sky-100 bg-sky-50/70 px-3 py-2">
+                        <p className="text-xs text-slate-600">Số dư tài khoản</p>
+                        <div className="mt-1 flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-slate-900">{walletBalance.toLocaleString("vi-VN")}đ</p>
+                          <Link
+                            href="/wallet/topup"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="inline-flex items-center gap-1 rounded-full bg-sky-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-sky-700"
+                          >
+                            <PlusCircle className="h-3.5 w-3.5" />
+                            <span>Nạp</span>
+                          </Link>
+                        </div>
+                      </div>
+                    )}
+
                     {userMenuItems.map((item) => (
                       <Link
                         key={item.href}
@@ -453,13 +509,7 @@ export function Navbar() {
               ) : (
                 <div className="flex gap-2">
                   <Link href="/login" className="flex-1">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      fullWidth
-                      className="gap-1.5"
-                      onClick={() => setOpen(false)}
-                    >
+                    <Button variant="secondary" size="sm" fullWidth className="gap-1.5" onClick={() => setOpen(false)}>
                       <LogIn className="h-4 w-4" />
                       <span>Đăng nhập</span>
                     </Button>

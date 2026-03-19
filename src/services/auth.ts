@@ -15,6 +15,7 @@ export interface AuthUser {
     completedJobs?: number | null;
     totalIncome?: number | string | null;
     onTimeRate?: number | null;
+    categories?: { category?: { id: string; name: string } }[];
   } | null;
   clientProfile?: {
     companyName?: string | null;
@@ -30,6 +31,7 @@ export async function register(payload: {
   email: string;
   password: string;
   role?: "CLIENT" | "FREELANCER";
+  categories?: string[];
 }) {
   const res = await apiFetch<{ user: AuthUser }>("/api/auth/register", {
     method: "POST",

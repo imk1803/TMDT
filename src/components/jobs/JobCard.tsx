@@ -2,13 +2,16 @@
 import Link from "next/link";
 import type { Job } from "@/types/job";
 import { Button } from "@/components/ui/Button";
-import { cn } from "@/lib/utils";
+import { CategoryIcon } from "@/components/categories/CategoryIcon";
+import { getCategoryBadge } from "@/lib/categoryBadge";
 
 interface JobCardProps {
   job: Job;
 }
 
 export function JobCard({ job }: JobCardProps) {
+  const badge = getCategoryBadge(job.categoryName);
+
   return (
     <article className="group flex flex-col justify-between rounded-2xl border border-slate-100 bg-white p-4 text-sm shadow-sm transition-all hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md sm:p-5">
       <div className="space-y-2">
@@ -21,20 +24,14 @@ export function JobCard({ job }: JobCardProps) {
               {job.companyName}
             </p>
           </div>
-          <span
-            className={cn(
-              "rounded-full px-2.5 py-1 text-[11px] font-medium capitalize",
-              job.type === "Toàn thời gian"
-                ? "bg-emerald-50 text-emerald-700"
-                : job.type === "Bán thời gian"
-                ? "bg-amber-50 text-amber-700"
-                : job.type === "Thực tập"
-                ? "bg-sky-50 text-sky-700"
-                : "bg-slate-50 text-slate-700"
-            )}
-          >
-            {job.type}
-          </span>
+          {job.categoryName ? (
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${badge.className}`}
+            >
+              <CategoryIcon name={badge.icon} className="h-3.5 w-3.5" />
+              {job.categoryName}
+            </span>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500 sm:text-xs">
           <span className="inline-flex items-center gap-1.5">

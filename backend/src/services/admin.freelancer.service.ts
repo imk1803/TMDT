@@ -10,7 +10,13 @@ export async function listFreelancersAdmin() {
       name: true,
       email: true,
       avatarUrl: true,
-      freelancerProfile: true,
+      freelancerProfile: {
+        include: {
+          categories: {
+            include: { category: true },
+          },
+        },
+      },
       createdAt: true,
     },
     orderBy: { createdAt: "desc" },
@@ -59,7 +65,13 @@ export async function updateFreelancerAdmin(
       name: true,
       email: true,
       avatarUrl: true,
-      freelancerProfile: true,
+      freelancerProfile: {
+        include: {
+          categories: {
+            include: { category: true },
+          },
+        },
+      },
       createdAt: true,
     },
   });
@@ -102,7 +114,13 @@ export async function createFreelancerAdmin(data: {
       name: true,
       email: true,
       avatarUrl: true,
-      freelancerProfile: true,
+      freelancerProfile: {
+        include: {
+          categories: {
+            include: { category: true },
+          },
+        },
+      },
       createdAt: true,
     },
   });

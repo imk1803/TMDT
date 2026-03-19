@@ -6,6 +6,7 @@ export const updateProfileSchema = z.object({
   title: z.string().optional(),
   bio: z.string().optional(),
   hourlyRate: z.number().nonnegative().optional(),
+  categories: z.array(z.string().min(2)).optional(),
   companyName: z.string().optional(),
   industry: z.string().optional(),
   location: z.string().optional(),

@@ -1,5 +1,6 @@
 ﻿'use client';
 
+import { useEffect, useState } from "react";
 import { Search, MapPin, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,26 @@ export function SearchBar({
   onChange,
   onSubmit,
 }: SearchBarProps) {
+  const [locations, setLocations] = useState<string[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadLocations() {
+      try {
+        const res = await fetch("/api/locations/provinces");
+        if (!res.ok) throw new Error("Failed");
+        const data = (await res.json()) as { locations?: string[] };
+        if (active && Array.isArray(data.locations)) setLocations(data.locations);
+      } catch {
+        if (active) setLocations([]);
+      }
+    }
+    loadLocations();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit();
@@ -52,10 +73,11 @@ export function SearchBar({
             )}
           >
             <option value="">Tất cả địa điểm</option>
-            <option value="Hà Nội">Hà Nội</option>
-            <option value="TP. Hồ Chí Minh">TP. Hồ Chí Minh</option>
-            <option value="Đà Nẵng">Đà Nẵng</option>
-            <option value="Remote">Remote</option>
+            {locations.map((loc) => (
+              <option key={loc} value={loc}>
+                {loc}
+              </option>
+            ))}
           </select>
         </div>
         <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 shadow-sm">

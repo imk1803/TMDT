@@ -2,8 +2,14 @@
 import { apiFetch } from "./api";
 
 export function mapFreelancer(apiUser: any): Freelancer {
-  const rawCategory = apiUser.freelancerProfile?.title;
-  const category = rawCategory && typeof rawCategory === "string" ? rawCategory : "IT";
+  const profileCategories = apiUser.freelancerProfile?.categories;
+  const categoryFromProfile =
+    Array.isArray(profileCategories) && profileCategories.length > 0
+      ? profileCategories[0]?.category?.name
+      : undefined;
+  const rawCategory = categoryFromProfile || apiUser.freelancerProfile?.title;
+  const category =
+    rawCategory && typeof rawCategory === "string" ? rawCategory : "Công nghệ thông tin";
 
   return {
     id: apiUser.id,

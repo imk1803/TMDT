@@ -8,6 +8,7 @@ export async function fetchJobsForSelect(): Promise<Job[]> {
     title: j.title,
     companyId: j.clientId,
     companyName: j.client?.clientProfile?.companyName || j.client?.name || "Doanh nghiệp",
+    categoryName: j.category?.name || undefined,
     location: j.location || "Remote",
     salary: "",
     salaryValue: j.budget ? Number(j.budget) : null,

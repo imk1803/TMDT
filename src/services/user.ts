@@ -8,6 +8,7 @@ export async function updateProfile(payload: {
   title?: string;
   bio?: string;
   hourlyRate?: number;
+  categories?: string[];
   companyName?: string;
   industry?: string;
   location?: string;

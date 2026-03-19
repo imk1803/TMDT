@@ -1,5 +1,5 @@
 ﻿import Image from "next/image";
-import { Star, Timer } from "lucide-react";
+import { Award, Bolt, Paintbrush2, Star, Timer, Wand2 } from "lucide-react";
 import type { Freelancer } from "@/types/freelancer";
 import {
   getAchievementBadges,
@@ -7,6 +7,8 @@ import {
   getIndustryBadgeByCategoryRank,
   getRankTrendInfo,
 } from "@/lib/ranking";
+import { CategoryIcon } from "@/components/categories/CategoryIcon";
+import { getCategoryBadge } from "@/lib/categoryBadge";
 
 function formatVnd(n: number) {
   return n.toLocaleString("vi-VN") + " VNĐ";
@@ -31,6 +33,36 @@ export function RankingCard({
     freelancer.currentRank
   );
   const badges = getAchievementBadges(freelancer);
+  const categoryBadge = getCategoryBadge(freelancer.category);
+  const badgeMeta: Record<
+    string,
+    { icon: JSX.Element; className: string }
+  > = {
+    "Design Hero": {
+      icon: <Paintbrush2 className="h-3.5 w-3.5" />,
+      className: "bg-pink-50 text-pink-700",
+    },
+    "IT Hero": {
+      icon: <Bolt className="h-3.5 w-3.5" />,
+      className: "bg-indigo-50 text-indigo-700",
+    },
+    "Marketing Hero": {
+      icon: <Wand2 className="h-3.5 w-3.5" />,
+      className: "bg-amber-50 text-amber-700",
+    },
+    "Content Hero": {
+      icon: <Star className="h-3.5 w-3.5" />,
+      className: "bg-emerald-50 text-emerald-700",
+    },
+    "Top Performer": {
+      icon: <Award className="h-3.5 w-3.5" />,
+      className: "bg-sky-50 text-sky-700",
+    },
+    "Fast Responder": {
+      icon: <Star className="h-3.5 w-3.5" />,
+      className: "bg-slate-100 text-slate-700",
+    },
+  };
 
   return (
     <article className="group rounded-3xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md">
@@ -53,9 +85,12 @@ export function RankingCard({
             <p className="truncate text-sm font-semibold text-slate-900">
               {freelancer.name}
             </p>
-            <p className="mt-0.5 truncate text-xs font-medium text-sky-600">
+            <span
+              className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${categoryBadge.className}`}
+            >
+              <CategoryIcon name={categoryBadge.icon} className="h-3.5 w-3.5" />
               {freelancer.category}
-            </p>
+            </span>
           </div>
         </div>
 
@@ -129,14 +164,21 @@ export function RankingCard({
           </div>
           {/* Hàng 2: badge thành tích cá nhân */}
           <div className="flex min-h-[28px] flex-wrap justify-end gap-1.5">
-            {badges.slice(0, 2).map((b) => (
-              <span
-                key={b}
-                className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-700"
-              >
-                {b}
-              </span>
-            ))}
+            {badges.slice(0, 2).map((b) => {
+              const meta = badgeMeta[b] || {
+                icon: <Award className="h-3.5 w-3.5" />,
+                className: "bg-slate-100 text-slate-700",
+              };
+              return (
+                <span
+                  key={b}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium ${meta.className}`}
+                >
+                  {meta.icon}
+                  {b}
+                </span>
+              );
+            })}
           </div>
           <span className="mt-0.5 text-[11px] font-medium text-slate-500">
             Score: {freelancer.rankingScore?.toFixed(2) ?? "—"}

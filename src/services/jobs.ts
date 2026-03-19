@@ -23,6 +23,7 @@ export function mapJob(apiJob: any): Job {
     title: apiJob.title,
     companyId: apiJob.clientId,
     companyName,
+    categoryName: apiJob?.category?.name || undefined,
     location: apiJob.location || "Remote",
     salary: formatVnd(budgetValue),
     salaryValue: budgetValue,
@@ -57,6 +58,8 @@ export async function createJob(payload: {
   workMode?: string;
   experienceLevel?: string;
   deadlineAt?: string;
+  categoryName?: string;
+  milestones?: { title: string; percent: number; dueDate?: string }[];
 }) {
   const token = getAccessToken();
   return apiFetch<{ job: any }>("/api/jobs", {
@@ -75,6 +78,8 @@ export async function updateJob(
     location?: string;
     workMode?: string;
     experienceLevel?: string;
+    categoryName?: string;
+    milestones?: { title: string; percent: number; dueDate?: string }[];
   }
 ) {
   const token = getAccessToken();

@@ -12,7 +12,10 @@ export async function adminFetchFreelancers(): Promise<Freelancer[]> {
     id: f.id,
     name: f.name,
     avatar: f.avatarUrl || "https://i.pravatar.cc/150?img=1",
-    category: (f.freelancerProfile?.title as Freelancer["category"]) || "IT",
+    category:
+      (f.freelancerProfile?.categories?.[0]?.category?.name as Freelancer["category"]) ||
+      (f.freelancerProfile?.title as Freelancer["category"]) ||
+      "Công nghệ thông tin",
     completedJobs: f.freelancerProfile?.completedJobs || 0,
     totalIncome: Number(f.freelancerProfile?.totalIncome || 0),
     rating: f.freelancerProfile?.rating || 0,

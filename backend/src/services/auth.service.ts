@@ -1,8 +1,9 @@
-import { prisma } from "../lib/prisma";
+﻿import { prisma } from "../lib/prisma";
 import { hashPassword, comparePassword } from "../utils/password";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/jwt";
 import { HttpError } from "../utils/http";
 import crypto from "crypto";
+import { applyDailyLogin } from "../services/gamification.service";
 
 function hashToken(token: string) {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -29,10 +30,11 @@ async function selectSafeUser(userId: string) {
 }
 
 export async function registerUser(input: {
-  name?: string;
-  email?: string;
-  password?: string;
+  name: string;
+  email: string;
+  password: string;
   role?: "CLIENT" | "FREELANCER";
+  categories?: string[];
 }) {
   if (!input.name || !input.email || !input.password) {
     throw new HttpError(400, "Name, email and password are required");
@@ -45,25 +47,66 @@ export async function registerUser(input: {
   }
   const passwordHash = await hashPassword(input.password);
   const role = input.role ?? "CLIENT";
-  const user = await prisma.user.create({
-    data: {
-      name: input.name,
-      email: normalizedEmail,
-      passwordHash,
-      role,
-      clientProfile: role === "CLIENT" ? { create: {} } : undefined,
-      freelancerProfile: role === "FREELANCER" ? { create: {} } : undefined,
-    },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      avatarUrl: true,
-      isBanned: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+  if (role === "FREELANCER" && (!input.categories || input.categories.length === 0)) {
+    throw new HttpError(400, "Freelancer categories are required");
+  }
+  const categoryNames =
+    role === "FREELANCER" && input.categories
+      ? Array.from(new Set(input.categories.map((c) => c.trim()).filter(Boolean)))
+      : [];
+
+  const user = await prisma.$transaction(async (tx) => {
+    const categoryIds =
+      categoryNames.length > 0
+        ? (
+            await Promise.all(
+              categoryNames.map((name) =>
+                tx.category.upsert({
+                  where: { name },
+                  create: { name },
+                  update: {},
+                  select: { id: true },
+                })
+              )
+            )
+          ).map((c) => c.id)
+        : [];
+
+    return tx.user.create({
+      data: {
+        name: input.name,
+        email: normalizedEmail,
+        passwordHash,
+        role,
+        clientProfile: role === "CLIENT" ? { create: {} } : undefined,
+        freelancerProfile:
+          role === "FREELANCER"
+            ? {
+                create: {
+                  categories: categoryIds.length
+                    ? {
+                        createMany: {
+                          data: categoryIds.map((categoryId) => ({ categoryId })),
+                          skipDuplicates: true,
+                        },
+                      }
+                    : undefined,
+                },
+              }
+            : undefined,
+        gamificationProfile: { create: {} },
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        avatarUrl: true,
+        isBanned: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
   });
 
   return user;
@@ -100,6 +143,12 @@ export async function loginUser(input: { email?: string; password?: string }) {
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     },
   });
+
+  try {
+    await applyDailyLogin(user.id);
+  } catch {
+    // do not block login on gamification
+  }
 
   return { user: safeUser, accessToken, refreshToken };
 }

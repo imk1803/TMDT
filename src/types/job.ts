@@ -12,6 +12,7 @@ export interface Job {
   title: string;
   companyId: string;
   companyName: string;
+  categoryName?: string;
   location: string;
   salary: string;
   salaryValue?: number | null;

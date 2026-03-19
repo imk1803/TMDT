@@ -6,6 +6,7 @@ export const registerSchema = z.object({
   // bcrypt ignores bytes after 72 chars; constrain to avoid silent truncation.
   password: z.string().min(6).max(72),
   role: z.enum(["CLIENT", "FREELANCER"]).optional(),
+  categories: z.array(z.string().min(2)).optional(),
 });
 
 export const loginSchema = z.object({

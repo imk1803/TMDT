@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/components/ui/Toast";
 import { updateProfile } from "@/services/user";
+import { categories } from "@/data/categories";
+import { CategoryIcon } from "@/components/categories/CategoryIcon";
 
 function redirectByRole(role?: string) {
   if (role === "CLIENT") return "/jobs/my";
@@ -27,6 +29,7 @@ export default function OnboardingPage() {
     bio: "",
     hourlyRate: "",
   });
+  const [freelancerCategories, setFreelancerCategories] = useState<string[]>([]);
 
   const [clientForm, setClientForm] = useState({
     companyName: "",
@@ -69,6 +72,11 @@ export default function OnboardingPage() {
         ? String(user.freelancerProfile.hourlyRate)
         : "",
     });
+    setFreelancerCategories(
+      user.freelancerProfile?.categories
+        ?.map((c) => c.category?.name)
+        .filter((x): x is string => Boolean(x)) || []
+    );
     setClientForm({
       companyName: user.clientProfile?.companyName || "",
       industry: user.clientProfile?.industry || "",
@@ -111,6 +119,14 @@ export default function OnboardingPage() {
       });
       return;
     }
+    if (freelancerCategories.length === 0) {
+      push({
+        title: "Thiếu ngành nghề",
+        description: "Vui lòng chọn ít nhất một ngành nghề.",
+        variant: "error",
+      });
+      return;
+    }
 
     const hourlyRate = freelancerForm.hourlyRate.trim()
       ? Number.parseFloat(freelancerForm.hourlyRate)
@@ -130,6 +146,7 @@ export default function OnboardingPage() {
         title: freelancerForm.title.trim(),
         bio: freelancerForm.bio.trim(),
         hourlyRate,
+        categories: freelancerCategories,
       });
       await refreshUser();
       push({
@@ -253,6 +270,38 @@ export default function OnboardingPage() {
                 onChange={(e) => setFreelancerForm((v) => ({ ...v, hourlyRate: e.target.value }))}
                 placeholder="Ví dụ: 300000"
               />
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-slate-700">Ngành nghề</div>
+                <div className="flex flex-wrap gap-2">
+                  {categories.map((cat) => {
+                    const active = freelancerCategories.includes(cat.name);
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() =>
+                          setFreelancerCategories((prev) =>
+                            prev.includes(cat.name)
+                              ? prev.filter((x) => x !== cat.name)
+                              : [...prev, cat.name]
+                          )
+                        }
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
+                          active
+                            ? "border-sky-500 bg-sky-50 text-sky-700"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-sky-200 hover:bg-sky-50"
+                        }`}
+                      >
+                        <CategoryIcon name={cat.icon} className="h-3.5 w-3.5" />
+                        {cat.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-slate-500">
+                  Bạn có thể chọn một hoặc nhiều ngành nghề phù hợp.
+                </p>
+              </div>
               <div className="flex justify-end">
                 <Button onClick={submitFreelancer} disabled={submitting}>
                   {submitting ? "Đang lưu..." : "Hoàn tất"}
@@ -265,4 +314,3 @@ export default function OnboardingPage() {
     </div>
   );
 }
-

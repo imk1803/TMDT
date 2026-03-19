@@ -3,11 +3,13 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BriefcaseBusiness, CheckCircle2, Lock, Mail, User, UserRoundSearch } from "lucide-react";
+import { BriefcaseBusiness, CheckCircle2, Lock, Mail, Tag, User, UserRoundSearch } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ApiError } from "@/services/api";
+import { categories } from "@/data/categories";
+import { CategoryIcon } from "@/components/categories/CategoryIcon";
 
 const MIN_PASSWORD = 6;
 type Role = "CLIENT" | "FREELANCER";
@@ -19,6 +21,7 @@ export function RegisterForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const { push } = useToast();
   const { register, login } = useAuth();
   const router = useRouter();
@@ -65,9 +68,18 @@ export function RegisterForm() {
       return;
     }
 
+    if (role === "FREELANCER" && selectedCategories.length === 0) {
+      push({
+        title: "Thiếu ngành nghề",
+        description: "Vui lòng chọn ít nhất một ngành nghề phù hợp.",
+        variant: "error",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      await register({ name, email, password, role });
+      await register({ name, email, password, role, categories: selectedCategories });
       await login(email, password);
       push({
         title: "Đăng ký thành công",
@@ -159,6 +171,44 @@ export function RegisterForm() {
             </button>
           </div>
         </div>
+
+        {role === "FREELANCER" && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <Tag className="h-4 w-4 text-sky-600" />
+              Chọn ngành nghề chính (có thể chọn nhiều)
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {categories.map((cat) => {
+                const active = selectedCategories.includes(cat.name);
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() =>
+                      setSelectedCategories((prev) =>
+                        prev.includes(cat.name)
+                          ? prev.filter((x) => x !== cat.name)
+                          : [...prev, cat.name]
+                      )
+                    }
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
+                      active
+                        ? "border-sky-500 bg-sky-50 text-sky-700"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-sky-200 hover:bg-sky-50"
+                    }`}
+                  >
+                    <CategoryIcon name={cat.icon} className="h-3.5 w-3.5" />
+                    {cat.name}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-slate-500">
+              Ngành nghề sẽ hiển thị trên hồ sơ và dùng để lọc ở ranking/gamification.
+            </p>
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-slate-700">Họ và tên</label>
@@ -256,4 +306,3 @@ export function RegisterForm() {
     </form>
   );
 }
-

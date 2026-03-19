@@ -46,7 +46,7 @@ export async function getMyWallet(userId: string) {
   return { wallet, transactions };
 }
 
-export async function topUpWallet(userId: string, amount: number) {
+export async function topUpWallet(userId: string, amount: number, method?: string) {
   ensurePositive(amount, "Top up amount must be positive");
 
   return db.$transaction(async (tx: any) => {
@@ -67,7 +67,42 @@ export async function topUpWallet(userId: string, amount: number) {
         userId,
         amount,
         type: "CREDIT",
-        description: "WALLET_TOPUP",
+        description: method ? `WALLET_TOPUP_${method}` : "WALLET_TOPUP",
+        balanceAfter: nextAvailable,
+      },
+    });
+
+    return { wallet: updatedWallet, transaction };
+  });
+}
+
+export async function withdrawWallet(userId: string, amount: number, method?: string) {
+  ensurePositive(amount, "Withdraw amount must be positive");
+
+  return db.$transaction(async (tx: any) => {
+    const wallet = await tx.wallet.upsert({
+      where: { userId },
+      update: {},
+      create: { userId },
+    });
+
+    const available = asNumber(wallet.availableBalance);
+    if (available < amount) {
+      throw new HttpError(400, "Insufficient wallet balance");
+    }
+
+    const nextAvailable = available - amount;
+    const updatedWallet = await tx.wallet.update({
+      where: { userId },
+      data: { availableBalance: nextAvailable },
+    });
+
+    const transaction = await tx.transaction.create({
+      data: {
+        userId,
+        amount,
+        type: "DEBIT",
+        description: method ? `WALLET_WITHDRAW_${method}` : "WALLET_WITHDRAW",
         balanceAfter: nextAvailable,
       },
     });

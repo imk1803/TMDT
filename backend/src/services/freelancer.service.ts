@@ -9,7 +9,13 @@ export async function listFreelancers() {
       email: true,
       role: true,
       avatarUrl: true,
-      freelancerProfile: true,
+      freelancerProfile: {
+        include: {
+          categories: {
+            include: { category: true },
+          },
+        },
+      },
       createdAt: true,
       updatedAt: true,
     },
@@ -25,7 +31,13 @@ export async function getFreelancer(id: string) {
       email: true,
       role: true,
       avatarUrl: true,
-      freelancerProfile: true,
+      freelancerProfile: {
+        include: {
+          categories: {
+            include: { category: true },
+          },
+        },
+      },
       createdAt: true,
       updatedAt: true,
     },

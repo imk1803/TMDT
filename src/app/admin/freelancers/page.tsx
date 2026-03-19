@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
 import { getEligibleRanked } from "@/lib/ranking";
 import type { Freelancer, FreelancerCategory } from "@/types/freelancer";
+import { CategoryIcon } from "@/components/categories/CategoryIcon";
+import { categories as categoryData } from "@/data/categories";
 import {
   adminCreateFreelancer,
   adminDeleteFreelancer,
@@ -44,7 +46,7 @@ export default function AdminFreelancersPage() {
     name: "",
     email: "",
     password: "",
-    category: "IT",
+    category: "Công nghệ thông tin",
     completedJobs: "",
     totalIncome: "",
     rating: "",
@@ -139,7 +141,7 @@ export default function AdminFreelancersPage() {
       name: "",
       email: "",
       password: "",
-      category: "IT",
+      category: "Công nghệ thông tin",
       completedJobs: "",
       totalIncome: "",
       rating: "",
@@ -392,7 +394,15 @@ export default function AdminFreelancersPage() {
                       </p>
                     </td>
                     <td className="hidden px-4 py-3 text-slate-700 md:table-cell">
-                      {f.category}
+                      <div className="inline-flex items-center gap-2">
+                        {categoryData.find((c) => c.name === f.category) && (
+                          <CategoryIcon
+                            name={categoryData.find((c) => c.name === f.category)!.icon}
+                            className="h-4 w-4 text-sky-600"
+                          />
+                        )}
+                        <span>{f.category}</span>
+                      </div>
                     </td>
                     <td className="hidden px-4 py-3 text-slate-700 lg:table-cell">
                       {f.rating}
@@ -572,11 +582,21 @@ export default function AdminFreelancersPage() {
                           }
                           className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 shadow-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                         >
-                          <option value="IT">IT</option>
-                          <option value="Kế toán">Kế toán</option>
-                          <option value="Thiết kế">Thiết kế</option>
-                          <option value="Marketing">Marketing</option>
-                          <option value="Viết nội dung">Viết nội dung</option>
+                          <option value="Công nghệ thông tin">Công nghệ thông tin</option>
+                          <option value="Thiết kế & Sáng tạo">Thiết kế & Sáng tạo</option>
+                          <option value="Marketing & Truyền thông">Marketing & Truyền thông</option>
+                          <option value="Viết lách & Nội dung">Viết lách & Nội dung</option>
+                          <option value="Tài chính & Kế toán">Tài chính & Kế toán</option>
+                          <option value="Kinh doanh & Bán hàng">Kinh doanh & Bán hàng</option>
+                          <option value="Hỗ trợ khách hàng">Hỗ trợ khách hàng</option>
+                          <option value="Nhân sự & Tuyển dụng">Nhân sự & Tuyển dụng</option>
+                          <option value="Quản lý dự án">Quản lý dự án</option>
+                          <option value="Pháp lý">Pháp lý</option>
+                          <option value="Giáo dục & Đào tạo">Giáo dục & Đào tạo</option>
+                          <option value="Dữ liệu & Phân tích">Dữ liệu & Phân tích</option>
+                          <option value="Sản phẩm & UX">Sản phẩm & UX</option>
+                          <option value="Ảnh/Video & Multimedia">Ảnh/Video & Multimedia</option>
+                          <option value="Dịch thuật">Dịch thuật</option>
                         </select>
                       </div>
 
