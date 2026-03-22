@@ -1,4 +1,34 @@
 import { prisma } from "../lib/prisma";
+import { chargeUser, creditUser, BillingAction } from "./billing.service";
+
+async function ensureMilestoneEditableWindow(contractId: string) {
+  const contract = await prisma.contract.findUnique({
+    where: { id: contractId },
+    select: { id: true, status: true },
+  });
+  if (!contract) {
+    throw new Error("Contract not found");
+  }
+
+  // Current contract statuses are ACTIVE/COMPLETED/CANCELLED.
+  // We treat the editable window as "pre-start" when contract is ACTIVE and
+  // all milestones are still PENDING.
+  if (contract.status !== "ACTIVE") {
+    throw new Error("Milestones are locked once contract has started");
+  }
+
+  const startedMilestone = await prisma.milestone.findFirst({
+    where: {
+      contractId,
+      status: { in: ["IN_PROGRESS", "SUBMITTED", "APPROVED"] },
+    },
+    select: { id: true },
+  });
+  if (startedMilestone) {
+    // Extension point: replace this hard lock with a change-request workflow.
+    throw new Error("Milestones are locked once contract is in progress");
+  }
+}
 
 export async function listContractMilestones(contractId: string, userId: string) {
   const contract = await prisma.contract.findUnique({
@@ -14,7 +44,10 @@ export async function listContractMilestones(contractId: string, userId: string)
 
   return prisma.milestone.findMany({
     where: { contractId },
-    orderBy: { createdAt: "asc" },
+    orderBy: [
+      { createdAt: "asc" },
+      { id: "asc" }
+    ],
   });
 }
 
@@ -41,6 +74,7 @@ export async function createMilestone(
   if (contract.clientId !== clientId) {
     throw new Error("Forbidden");
   }
+  await ensureMilestoneEditableWindow(contract.id);
 
   return prisma.milestone.create({
     data: {
@@ -90,14 +124,30 @@ export async function approveMilestone(milestoneId: string, clientId: string) {
     throw new Error("Forbidden");
   }
 
-  const updated = await prisma.milestone.update({
-    where: { id: milestoneId },
-    data: {
-      status: "APPROVED",
-      approvedAt: new Date(),
-      paidAt: new Date(),
-    },
+  const updated = await prisma.$transaction(async (tx) => {
+    // 1. Tiền đã được tạm giữ lúc IN_PROGRESS, nay chỉ cần chuyển cho Freelancer
+
+    // 2. Cộng tiền vào ví của Freelancer (đã trừ 10% phí nền tảng)
+    const netAmount = Number(milestone.amount) * 0.9;
+    await creditUser(
+      tx,
+      milestone.contract.freelancerId,
+      "GIAI ĐOẠN",
+      `Thanh toán giai đoạn: ${milestone.title}`,
+      netAmount
+    );
+
+    // 3. Đánh dấu giai đoạn hoàn tất
+    return tx.milestone.update({
+      where: { id: milestoneId },
+      data: {
+        status: "APPROVED",
+        approvedAt: new Date(),
+        paidAt: new Date(),
+      },
+    });
   });
+
   return { milestone: updated, contract: milestone.contract };
 }
 
@@ -113,18 +163,34 @@ export async function updateMilestone(
 ) {
   const milestone = await prisma.milestone.findUnique({
     where: { id: milestoneId },
-    include: { contract: { select: { clientId: true } } },
+    include: { contract: { select: { id: true, clientId: true } } },
   });
   if (!milestone) throw new Error("Milestone not found");
   if (milestone.contract.clientId !== clientId) throw new Error("Forbidden");
 
-  return prisma.milestone.update({
-    where: { id: milestoneId },
-    data: {
-      title: data.title ?? undefined,
-      amount: data.amount ?? undefined,
-      dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
-      status: data.status ?? undefined,
-    },
+  const isEditingFields =
+    data.title !== undefined || data.amount !== undefined || data.dueDate !== undefined;
+  if (isEditingFields) {
+    await ensureMilestoneEditableWindow(milestone.contract.id);
+  }
+
+  return prisma.$transaction(async (tx) => {
+    // Escrow: Tạm giữ quỹ khi bắt đầu giai đoạn
+    if (milestone.status === "PENDING" && data.status === "IN_PROGRESS") {
+      await chargeUser(tx, clientId, BillingAction.RELEASE_PAYMENT, {
+        amountOverride: Number(milestone.amount),
+        referenceId: milestone.id,
+      });
+    }
+
+    return tx.milestone.update({
+      where: { id: milestoneId },
+      data: {
+        title: data.title ?? undefined,
+        amount: data.amount ?? undefined,
+        dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
+        status: data.status ?? undefined,
+      },
+    });
   });
 }

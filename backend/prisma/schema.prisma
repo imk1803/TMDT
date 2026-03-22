@@ -47,15 +47,25 @@ enum SupportStatus {
   OPEN
   IN_PROGRESS
   RESOLVED
+  CLOSED
 }
 
-enum NotificationType {
+enum SupportType {
+  SUPPORT
+  DISPUTE
+}
+
+enum SupportPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum NotificationCategory {
   SYSTEM
-  JOB
-  PROPOSAL
-  CONTRACT
-  REVIEW
   MESSAGE
+  PAYMENT
+  SUPPORT
 }
 
 enum PaymentStatus {
@@ -73,6 +83,11 @@ enum EscrowStatus {
 enum TransactionType {
   DEBIT
   CREDIT
+}
+
+enum TransactionCategory {
+  USER
+  PLATFORM
 }
 
 enum ReportStatus {
@@ -106,6 +121,12 @@ enum ReportTargetType {
   CONTRACT
 }
 
+enum ResourceType {
+  FILE
+  IMAGE
+  LINK
+}
+
 model User {
   id           String          @id @default(cuid())
   name         String
@@ -137,9 +158,12 @@ model User {
   notifications Notification[]
   bookmarks     Bookmark[] @relation("BookmarkOwner")
   bookmarkedFreelancers Bookmark[] @relation("BookmarkFreelancer")
-  supportTickets SupportTicket[]
+  supportTickets SupportTicket[] @relation("SupportTicketsSent")
+  supportMessages SupportMessage[] @relation("SupportMessagesSent")
   reports       Report[] @relation("ReportsByUser")
   adminActions  AdminAction[] @relation("AdminActionsByUser")
+  uploadedResources Resource[] @relation("UploadedResources")
+  activities    ContractActivity[] @relation("UserActivities")
 
   transactions Transaction[]
   refreshTokens RefreshToken[]
@@ -157,7 +181,8 @@ model FreelancerProfile {
   title         String?
   bio           String?
   hourlyRate    Decimal? @db.Decimal(10, 2)
-  rating        Float    @default(0)
+  avgRating     Float    @default(0)
+  totalReviews  Int      @default(0)
   onTimeRate    Float    @default(0)
   completedJobs Int      @default(0)
   totalIncome   Decimal  @default(0) @db.Decimal(12, 2)
@@ -170,7 +195,7 @@ model FreelancerProfile {
   portfolio  Portfolio[]
   categories FreelancerCategory[]
 
-  @@index([rating])
+  @@index([avgRating])
   @@index([onTimeRate])
 }
 
@@ -183,6 +208,8 @@ model ClientProfile {
   industry     String?
   location     String?
   tagline      String?
+  avgRating    Float    @default(0)
+  totalReviews Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -195,9 +222,11 @@ model Job {
   title       String
   description String
   budget      Decimal    @db.Decimal(12, 2)
+  budgetType  String?    @default("Ngân sách cố định")
   location    String?
   workMode    String?
   experienceLevel String?
+  durationText String?
   deadlineAt  DateTime?
   status      JobStatus  @default(OPEN)
   categoryId  String?
@@ -273,6 +302,9 @@ model Contract {
   reviews      Review[]
   payments     Payment[]
   milestones   Milestone[]
+  resources    Resource[]
+  activities   ContractActivity[]
+  supportTickets SupportTicket[]
 
   @@index([clientId])
   @@index([freelancerId])
@@ -339,6 +371,7 @@ model Review {
   contractId  String
   reviewerId  String
   revieweeId  String
+  role        Role     @default(CLIENT)
   rating      Int
   comment     String?
   createdAt   DateTime @default(now())
@@ -353,14 +386,18 @@ model Review {
 }
 
 model Notification {
-  id        String           @id @default(cuid())
-  userId    String
-  type      NotificationType @default(SYSTEM)
-  title     String
-  body      String
-  link      String?
-  readAt    DateTime?
-  createdAt DateTime         @default(now())
+  id          String               @id @default(cuid())
+  userId      String
+  type        String               @default("SYSTEM")
+  category    NotificationCategory @default(SYSTEM)
+  title       String
+  body        String
+  link        String?
+  isRead      Boolean              @default(false) @map("is_read")
+  referenceId String?              @map("reference_id")
+  metadata    Json?
+  readAt      DateTime?
+  createdAt   DateTime             @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -390,6 +427,8 @@ model Transaction {
   paymentId  String?
   amount     Decimal          @db.Decimal(12, 2)
   type       TransactionType
+  category   TransactionCategory @default(USER)
+  action     String?
   description String?
   balanceAfter Decimal?       @db.Decimal(12, 2)
   createdAt  DateTime         @default(now())
@@ -510,18 +549,40 @@ model Bookmark {
 }
 
 model SupportTicket {
-  id        String        @id @default(cuid())
-  userId    String
-  subject   String
-  message   String
-  status    SupportStatus @default(OPEN)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id          String          @id @default(cuid())
+  contractId  String?
+  senderId    String
+  title       String
+  description String
+  type        SupportType     @default(SUPPORT)
+  priority    SupportPriority @default(MEDIUM)
+  status      SupportStatus   @default(OPEN)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sender    User       @relation("SupportTicketsSent", fields: [senderId], references: [id], onDelete: Cascade)
+  contract  Contract?  @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  messages  SupportMessage[]
 
-  @@index([userId])
+  @@index([senderId])
+  @@index([contractId])
   @@index([status])
+  @@index([type])
+}
+
+model SupportMessage {
+  id          String   @id @default(cuid())
+  ticketId    String
+  senderId    String
+  message     String
+  attachments String[] @default([])
+  createdAt   DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender User          @relation("SupportMessagesSent", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([senderId])
 }
 
 model Report {
@@ -600,6 +661,38 @@ model RefreshToken {
   @@index([userId])
   @@index([expiresAt])
 }
+
+model Resource {
+  id         String       @id @default(cuid())
+  contractId String
+  uploaderId String
+  type       ResourceType
+  url        String
+  fileName   String?
+  fileSize   Int?         // in bytes
+  createdAt  DateTime     @default(now())
+
+  contract   Contract     @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  uploader   User         @relation("UploadedResources", fields: [uploaderId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
+  @@index([uploaderId])
+}
+
+model ContractActivity {
+  id         String   @id @default(cuid())
+  contractId String
+  userId     String
+  message    String
+  createdAt  DateTime @default(now())
+
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  user       User     @relation("UserActivities", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
+  @@index([userId])
+}
+
 
 
 

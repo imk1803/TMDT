@@ -1,4 +1,4 @@
-﻿export type JobType =
+export type JobType =
   | "Toàn thời gian"
   | "Bán thời gian"
   | "Thực tập"
@@ -21,4 +21,8 @@ export interface Job {
   experienceLevel: "Junior" | "Mid" | "Senior";
   tags: string[];
   description: string;
+  budgetType?: string | null;
+  durationText?: string | null;
+  createdAt?: string;
+  clientRating?: number;
 }

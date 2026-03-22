@@ -50,12 +50,19 @@ export const update = withErrorHandler(withAuth(withRole(["CLIENT"], async (req:
   if (payload.status === "ACCEPTED") {
     try {
       const contract = await createContract((req as any).user.id, { proposalId: id });
-      await createNotification({
-        userId: proposal.freelancerId,
-        type: "PROPOSAL",
+      await createNotification(proposal.freelancerId, "notification:proposal_accepted", {
         title: "Đề xuất của bạn đã được chấp nhận",
         body: "Nhà tuyển dụng đã chấp nhận đề xuất và hợp đồng đã được tạo.",
         link: `/contracts/${contract.id}`,
+        category: "SYSTEM",
+        referenceId: proposal.id,
+      });
+      await createNotification(proposal.freelancerId, "notification:contract_started", {
+        title: "Hợp đồng đã bắt đầu",
+        body: "Hợp đồng mới của bạn đã được khởi tạo thành công.",
+        link: `/contracts/${contract.id}`,
+        category: "SYSTEM",
+        referenceId: contract.id,
       });
       return sendJson(res, 200, { proposal: { ...proposal, status: "ACCEPTED" }, contract });
     } catch (err: any) {
@@ -64,12 +71,12 @@ export const update = withErrorHandler(withAuth(withRole(["CLIENT"], async (req:
   }
 
   const updated = await updateProposalStatus(id, "REJECTED");
-  await createNotification({
-    userId: proposal.freelancerId,
-    type: "PROPOSAL",
-    title: "Äá» xuáº¥t cá»§a báº¡n Ä‘Ã£ bá»‹ tá»« chá»‘i",
-    body: "NhÃ  tuyá»ƒn dá»¥ng Ä‘Ã£ tá»« chá»‘i Ä‘á» xuáº¥t cá»§a báº¡n cho cÃ´ng viá»‡c nÃ y.",
+  await createNotification(proposal.freelancerId, "notification:proposal_rejected", {
+    title: "Đề xuất của bạn đã bị từ chối",
+    body: "Nhà tuyển dụng đã từ chối đề xuất của bạn cho công việc này.",
     link: `/jobs/${proposal.job.id}`,
+    category: "SYSTEM",
+    referenceId: proposal.id,
   });
   sendJson(res, 200, { proposal: updated });
 })));
@@ -83,5 +90,3 @@ export const remove = withErrorHandler(withAuth(async (req: NextApiRequest, res:
   const proposal = await deleteProposal(id);
   sendJson(res, 200, { proposal });
 }));
-
-

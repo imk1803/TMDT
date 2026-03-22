@@ -1,2 +1,2 @@
-import { my } from "../../../controllers/support.controller";
-export default my;
+import { getMyTickets } from "../../../controllers/support.controller";
+export default getMyTickets;

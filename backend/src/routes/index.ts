@@ -22,4 +22,14 @@ export const routes = {
     "/api/admin/support",
     "/api/admin/support/:id",
   ],
+  resources: [
+    "/api/resources/upload",
+    "/api/resources/link",
+    "/api/resources/:contractId",
+    "/api/resources/delete/:id"
+  ],
+  activities: [
+    "/api/activities/:contractId"
+  ]
 };
+

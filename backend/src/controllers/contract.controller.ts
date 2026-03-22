@@ -1,5 +1,11 @@
-import { createContractSchema } from "../validators/contract";
-import { createContract, listMyContracts, completeContract, cancelContract } from "../services/contract.service";
+import { createContractSchema, updateContractSchema } from "../validators/contract";
+import {
+  createContract,
+  listMyContracts,
+  completeContract,
+  cancelContract,
+  updateContractDetails,
+} from "../services/contract.service";
 import { sendJson, sendError } from "../utils/http";
 import { withAuth } from "../middleware/auth";
 import { withRole } from "../middleware/role";
@@ -47,5 +53,20 @@ export const cancel = withErrorHandler(withAuth(async (req, res) => {
   const contract = await cancelContract(id);
   sendJson(res, 200, { contract });
 }));
+
+export const update = withErrorHandler(withAuth(withRole(["CLIENT"], async (req, res) => {
+  if (req.method !== "PUT") {
+    res.status(405).end();
+    return;
+  }
+  const id = req.query.id as string;
+  const payload = updateContractSchema.parse(req.body);
+  try {
+    const contract = await updateContractDetails(id, (req as any).user.id, payload as any);
+    sendJson(res, 200, { contract });
+  } catch (err: any) {
+    return sendError(res, 400, err?.message || "Cannot update contract");
+  }
+})));
 
 

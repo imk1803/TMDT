@@ -11,7 +11,8 @@ export interface AuthUser {
     title?: string | null;
     bio?: string | null;
     hourlyRate?: number | string | null;
-    rating?: number | null;
+    avgRating?: number | null;
+    totalReviews?: number | null;
     completedJobs?: number | null;
     totalIncome?: number | string | null;
     onTimeRate?: number | null;

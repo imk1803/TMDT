@@ -1,4 +1,4 @@
-﻿import type { Freelancer } from "@/types/freelancer";
+import type { Freelancer } from "@/types/freelancer";
 import { apiFetch } from "./api";
 
 export function mapFreelancer(apiUser: any): Freelancer {
@@ -18,7 +18,7 @@ export function mapFreelancer(apiUser: any): Freelancer {
     category: category as Freelancer["category"],
     completedJobs: apiUser.freelancerProfile?.completedJobs || 0,
     totalIncome: Number(apiUser.freelancerProfile?.totalIncome || 0),
-    rating: apiUser.freelancerProfile?.rating || 0,
+    rating: apiUser.freelancerProfile?.avgRating || 0,
     onTimeRate: apiUser.freelancerProfile?.onTimeRate ?? 90,
   };
 }

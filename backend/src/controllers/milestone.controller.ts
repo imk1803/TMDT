@@ -1,4 +1,4 @@
-﻿import type { NextApiRequest, NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { createMilestoneSchema, updateMilestoneSchema } from "../validators/milestone";
 import {
   createMilestone,
@@ -59,12 +59,12 @@ export const submit = withErrorHandler(
         const result = await submitMilestone(id, (req as any).user.id);
         const milestone = result.milestone;
         const contract = result.contract;
-        await createNotification({
-          userId: contract.clientId,
-          type: "CONTRACT",
+        await createNotification(contract.clientId, "notification:milestone_submitted", {
           title: "Milestone được gửi",
           body: `Freelancer đã gửi milestone: ${milestone.title}.`,
           link: `/contracts/${contract.id}`,
+          category: "PAYMENT",
+          referenceId: milestone.id,
         });
         sendJson(res, 200, { milestone });
       } catch (err: any) {
@@ -86,12 +86,12 @@ export const approve = withErrorHandler(
         const result = await approveMilestone(id, (req as any).user.id);
         const milestone = result.milestone;
         const contract = result.contract;
-        await createNotification({
-          userId: contract.freelancerId,
-          type: "CONTRACT",
+        await createNotification(contract.freelancerId, "notification:milestone_approved", {
           title: "Milestone được duyệt",
-          body: `Milestone ${milestone.title} đã được duyệt và thanh toán (demo).`,
+          body: `Milestone ${milestone.title} đã được duyệt và thanh toán.`,
           link: `/contracts/${contract.id}`,
+          category: "PAYMENT",
+          referenceId: milestone.id,
         });
         sendJson(res, 200, { milestone });
       } catch (err: any) {

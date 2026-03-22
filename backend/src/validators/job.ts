@@ -14,11 +14,11 @@ const milestoneSchema = z.object({
 });
 
 function validateMilestonePercentTotal(
-  milestones: Array<{ percent: number }> | undefined,
+  milestones: Array<{ percent?: number }> | undefined,
   ctx: z.RefinementCtx
 ) {
   if (!milestones) return;
-  const totalPercent = milestones.reduce((sum, item) => sum + item.percent, 0);
+  const totalPercent = milestones.reduce((sum, item) => sum + (item.percent ?? 0), 0);
   if (totalPercent !== 100) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -33,9 +33,11 @@ export const createJobSchema = z
     title: z.string().min(3),
     description: z.string().min(10),
     budget: z.number().min(0),
+    budgetType: z.string().optional(),
     location: z.string().optional(),
     workMode: z.string().optional(),
     experienceLevel: z.string().optional(),
+    durationText: z.string().optional(),
     deadlineAt: z.string().datetime().optional(),
     categoryId: z.string().optional(),
     categoryName: z.string().optional(),
@@ -51,9 +53,11 @@ export const updateJobSchema = z
     title: z.string().min(3).optional(),
     description: z.string().min(10).optional(),
     budget: z.number().min(0).optional(),
+    budgetType: z.string().optional(),
     location: z.string().optional(),
     workMode: z.string().optional(),
     experienceLevel: z.string().optional(),
+    durationText: z.string().optional(),
     deadlineAt: z.string().datetime().optional(),
     categoryId: z.string().optional(),
     categoryName: z.string().optional(),

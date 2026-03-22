@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -17,7 +17,7 @@ interface FreelancerDetail {
     title?: string | null;
     bio?: string | null;
     hourlyRate?: number | string | null;
-    rating?: number | null;
+    avgRating?: number | null;
     completedJobs?: number | null;
     totalIncome?: number | string | null;
     onTimeRate?: number | null;
@@ -133,7 +133,7 @@ export default function FreelancerDetailPage() {
           )}
 
           <div className="mt-6 grid gap-3 text-sm text-slate-700 sm:grid-cols-2 lg:grid-cols-4">
-            <div><span className="font-semibold">Rating:</span> {profile.rating ?? "—"}</div>
+            <div><span className="font-semibold">Rating:</span> {typeof profile.avgRating === 'number' ? profile.avgRating.toFixed(1) : "—"}</div>
             <div><span className="font-semibold">Đúng hạn:</span> {profile.onTimeRate ?? "—"}%</div>
             <div><span className="font-semibold">Job hoàn thành:</span> {profile.completedJobs ?? "—"}</div>
             <div><span className="font-semibold">Tổng thu nhập:</span> {formatVnd(profile.totalIncome)}</div>

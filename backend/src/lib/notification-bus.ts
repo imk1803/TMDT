@@ -11,7 +11,7 @@ if (!globalForNotificationBus.notificationBus) {
   globalForNotificationBus.notificationBus = notificationBus;
 }
 
-export function emitNotificationsChanged(userId: string) {
-  notificationBus.emit("notifications:changed", { userId });
+export function emitNotificationsChanged(userId: string, notification?: any) {
+  notificationBus.emit("notifications:changed", { userId, notification });
 }
 

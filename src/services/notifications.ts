@@ -3,10 +3,14 @@ import { getAccessToken } from "./storage";
 
 export interface AppNotification {
   id: string;
-  type: "SYSTEM" | "JOB" | "PROPOSAL" | "CONTRACT" | "REVIEW" | "MESSAGE";
+  type: string;
+  category: "SYSTEM" | "MESSAGE" | "PAYMENT" | "SUPPORT";
   title: string;
   body: string;
   link?: string | null;
+  isRead: boolean;
+  referenceId?: string | null;
+  metadata?: any;
   readAt?: string | null;
   createdAt: string;
 }

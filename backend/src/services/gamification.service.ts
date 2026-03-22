@@ -1,4 +1,4 @@
-﻿import { prisma } from "../lib/prisma";
+import { prisma } from "../lib/prisma";
 
 const LEVEL_THRESHOLDS = [
   { level: "BRONZE" as const, minPoints: 0 },
@@ -74,7 +74,7 @@ async function computeIndustryBadges(userId: string) {
   }
 
   const badges: string[] = [];
-  for (const [name, count] of counts.entries()) {
+  for (const [name, count] of Array.from(counts.entries())) {
     const key = normalizeText(name);
     if (count >= DESIGN_HERO_MIN_JOBS && key.includes("thiet ke")) {
       badges.push("Design Hero");
@@ -99,13 +99,13 @@ async function computeIndustryBadges(userId: string) {
 async function computeBadges(userId: string) {
   const profile = await prisma.freelancerProfile.findUnique({
     where: { userId },
-    select: { completedJobs: true, rating: true, onTimeRate: true },
+    select: { completedJobs: true, avgRating: true, onTimeRate: true },
   });
 
   const badges: string[] = [];
 
   if (profile) {
-    if (profile.completedJobs >= 50 && profile.rating >= 4.5) {
+    if (profile.completedJobs >= 50 && profile.avgRating >= 4.5) {
       badges.push("Top Performer");
     }
     if (profile.onTimeRate >= 95) {

@@ -1,4 +1,4 @@
-﻿import type { Job } from "@/types/job";
+import type { Job } from "@/types/job";
 import { apiFetch } from "./api";
 import { getAccessToken } from "./storage";
 
@@ -34,6 +34,10 @@ export function mapJob(apiJob: any): Job {
       ? apiJob.skills.map((s: any) => s.skill?.name).filter(Boolean)
       : [],
     description: apiJob.description || "",
+    budgetType: apiJob.budgetType || "Ngân sách cố định",
+    durationText: apiJob.durationText || null,
+    createdAt: apiJob.createdAt,
+    clientRating: apiJob?.client?.clientProfile?.avgRating || 0,
   };
 }
 
@@ -59,6 +63,7 @@ export async function createJob(payload: {
   experienceLevel?: string;
   deadlineAt?: string;
   categoryName?: string;
+  skillIds?: string[];
   milestones?: { title: string; percent: number; dueDate?: string }[];
 }) {
   const token = getAccessToken();
@@ -79,6 +84,7 @@ export async function updateJob(
     workMode?: string;
     experienceLevel?: string;
     categoryName?: string;
+    skillIds?: string[];
     milestones?: { title: string; percent: number; dueDate?: string }[];
   }
 ) {

@@ -15,16 +15,16 @@ export function AdminPageHeader({
   return (
     <div
       className={cn(
-        "mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-end sm:justify-between",
+        "mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between border-b border-zinc-800/60 pb-6",
         className
       )}
     >
       <div>
-        <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
+        <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
           {title}
         </h1>
         {subtitle && (
-          <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+          <p className="mt-2 text-sm text-zinc-400">{subtitle}</p>
         )}
       </div>
       {actions && <div className="flex items-center gap-3">{actions}</div>}

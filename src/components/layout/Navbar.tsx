@@ -70,7 +70,7 @@ export function Navbar() {
 
   const applyNotifications = useCallback((items: AppNotification[]) => {
     setRecentNotifications(items.slice(0, 5));
-    setUnreadCount(items.filter((n) => !n.readAt).length);
+    setUnreadCount(items.filter((n) => !n.isRead).length);
   }, []);
 
   const loadWallet = useCallback(async () => {
@@ -125,6 +125,23 @@ export function Navbar() {
     };
     es?.addEventListener("unread_count", onUnreadCount as EventListener);
 
+    const onNewNotification = (event: MessageEvent) => {
+      try {
+        const item: AppNotification = JSON.parse(event.data || "{}");
+        if (item && item.id) {
+          loadNotifications();
+          push({
+            title: item.title,
+            description: item.body,
+            variant: "info",
+          });
+        }
+      } catch {
+        // ignore
+      }
+    };
+    es?.addEventListener("new_notification", onNewNotification as EventListener);
+
     const onVisible = () => {
       if (document.visibilityState === "visible") loadNotifications();
     };
@@ -144,6 +161,7 @@ export function Navbar() {
     return () => {
       window.clearInterval(intervalId);
       es?.removeEventListener("unread_count", onUnreadCount as EventListener);
+      es?.removeEventListener("new_notification", onNewNotification as EventListener);
       es?.close();
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onFocus);
@@ -177,13 +195,12 @@ export function Navbar() {
     };
   }, [loadWallet, mounted, user]);
 
-  const navItems = [
+  const navItems: { href: string; label: string; disabled?: boolean }[] = [
     { href: "/", label: "Trang chủ" },
     { href: "/jobs", label: "Tìm việc" },
     { href: "/ranking", label: "Xếp hạng" },
-    { href: "/companies", label: "Công ty", disabled: true },
-    { href: "/about", label: "Giới thiệu", disabled: true },
-    ...(mounted && user?.role === "ADMIN" ? [{ href: "/admin", label: "Admin" as const }] : []),
+    { href: "/about", label: "Giới thiệu" },
+    ...(mounted && user?.role === "ADMIN" ? [{ href: "/admin", label: "Admin" }] : []),
   ];
 
   const userMenuItems =
@@ -192,16 +209,18 @@ export function Navbar() {
           { href: "/notifications", label: "Thông báo" },
           { href: "/profile", label: "Hồ sơ" },
           { href: "/wallet", label: "Ví của tôi" },
-          { href: "/contracts", label: "Hợp đồng đang thực hiện" },
+          { href: "/contracts", label: "Hợp đồng của tôi" },
           { href: "/jobs/my", label: "Tin tuyển dụng của tôi" },
+          { href: "/support", label: "Hỗ trợ & Khiếu nại" },
         ]
       : user?.role === "FREELANCER"
       ? [
           { href: "/notifications", label: "Thông báo" },
           { href: "/profile", label: "Hồ sơ" },
           { href: "/wallet", label: "Ví của tôi" },
-          { href: "/contracts", label: "Hợp đồng đang thực hiện" },
+          { href: "/contracts", label: "Hợp đồng của tôi" },
           { href: "/proposals/my", label: "Đề xuất của tôi" },
+          { href: "/support", label: "Hỗ trợ & Khiếu nại" },
         ]
       : user?.role === "ADMIN"
       ? [{ href: "/admin", label: "Trang quản trị" }]
@@ -223,9 +242,9 @@ export function Navbar() {
   async function handleNotificationClick(item: AppNotification) {
     const href = resolveNotificationHref(item);
 
-    if (!item.readAt) {
+    if (!item.isRead) {
       setRecentNotifications((prev) =>
-        prev.map((n) => (n.id === item.id ? { ...n, readAt: n.readAt || new Date().toISOString() } : n))
+        prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n))
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
       try {
@@ -347,7 +366,7 @@ export function Navbar() {
                               onClick={() => handleNotificationClick(item)}
                               className={cn(
                                 "mb-1 block w-full rounded-xl border px-3 py-2.5 text-left transition-colors hover:bg-sky-50",
-                                item.readAt ? "border-slate-100 bg-white" : "border-sky-200 bg-sky-50/60"
+                                item.isRead ? "border-slate-100 bg-white" : "border-sky-200 bg-sky-50/60"
                               )}
                             >
                               <p className="text-sm font-medium text-slate-900">{item.title}</p>

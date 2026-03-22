@@ -9,6 +9,13 @@ import {
   updateReport,
   listSupportTickets,
   updateSupportTicket,
+  getDashboardStats,
+  listAllContracts,
+  listAllTransactions,
+  getAdminLeaderboard,
+  getAdminResources,
+  getPlatformRevenue,
+  getUserTransactionVolume
 } from "../services/admin.service";
 import { sendJson } from "../utils/http";
 import { withAuth } from "../middleware/auth";
@@ -26,7 +33,8 @@ export const ban = withErrorHandler(withAuth(withAdmin(async (req: NextApiReques
     return;
   }
   const id = req.query.id as string;
-  const user = await banUser(id, true);
+  const isBanned = req.body?.isBanned === true;
+  const user = await banUser(id, isBanned);
   sendJson(res, 200, { user });
 })));
 
@@ -87,4 +95,35 @@ export const updateSupport = withErrorHandler(withAuth(withAdmin(async (req: Nex
   sendJson(res, 200, { ticket });
 })));
 
+export const stats = withErrorHandler(withAuth(withAdmin(async (_req: NextApiRequest, res: NextApiResponse) => {
+  const data = await getDashboardStats();
+  sendJson(res, 200, data);
+})));
 
+export const allContracts = withErrorHandler(withAuth(withAdmin(async (_req: NextApiRequest, res: NextApiResponse) => {
+  const contracts = await listAllContracts();
+  sendJson(res, 200, { contracts });
+})));
+
+export const transactions = withErrorHandler(withAuth(withAdmin(async (_req: NextApiRequest, res: NextApiResponse) => {
+  const transactions = await listAllTransactions();
+  sendJson(res, 200, { transactions });
+})));
+
+export const revenue = withErrorHandler(withAuth(withAdmin(async (_req: NextApiRequest, res: NextApiResponse) => {
+  const [platformRevenue, userVolume] = await Promise.all([
+    getPlatformRevenue(),
+    getUserTransactionVolume()
+  ]);
+  sendJson(res, 200, { platformRevenue, userVolume });
+})));
+
+export const leaderboard = withErrorHandler(withAuth(withAdmin(async (_req: NextApiRequest, res: NextApiResponse) => {
+  const data = await getAdminLeaderboard();
+  sendJson(res, 200, { leaderboard: data });
+})));
+
+export const resources = withErrorHandler(withAuth(withAdmin(async (_req: NextApiRequest, res: NextApiResponse) => {
+  const data = await getAdminResources();
+  sendJson(res, 200, { resources: data });
+})));

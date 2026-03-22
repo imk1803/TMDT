@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -245,6 +245,7 @@ export default function NewJobPage() {
         experienceLevel: form.experienceLevel,
         deadlineAt: computeDeadline(),
         categoryName: form.categoryName || undefined,
+        skillIds: skills,
         milestones: milestones.map((m) => ({
           title: m.title.trim(),
           percent: m.percent,
@@ -524,6 +525,15 @@ export default function NewJobPage() {
                     </div>
                   )}
                 </div>
+              </div>
+
+              <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-center">
+                <p className="text-sm font-semibold text-sky-800">
+                  Phí đăng tin: 10.000 VND
+                </p>
+                <p className="mt-1 text-xs text-sky-600">
+                  Hệ thống sẽ tự động trừ phí vào số dư ví của bạn khi tạo tin thành công.
+                </p>
               </div>
 
               <Button type="submit" fullWidth disabled={submitting}>

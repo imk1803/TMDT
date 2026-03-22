@@ -1,2 +1,2 @@
-import { create } from "../../../controllers/support.controller";
-export default create;
+import { createTicket } from "../../../controllers/support.controller";
+export default createTicket;

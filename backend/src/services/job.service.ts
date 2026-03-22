@@ -1,4 +1,6 @@
-﻿import { prisma } from "../lib/prisma";
+import { prisma } from "../lib/prisma";
+import { chargeUser, BillingAction } from "./billing.service";
+import { createNotification } from "./notification.service";
 
 function validateMilestoneRules(
   milestones: Array<{ percent: number }> | undefined
@@ -78,9 +80,11 @@ export async function createJob(
     title?: string;
     description?: string;
     budget?: number;
+    budgetType?: string;
     location?: string;
     workMode?: string;
     experienceLevel?: string;
+    durationText?: string;
     deadlineAt?: string;
     categoryId?: string;
     categoryName?: string;
@@ -93,41 +97,74 @@ export async function createJob(
   }
   validateMilestoneRules(data.milestones);
 
-  let resolvedCategoryId = data.categoryId;
-  const normalizedCategoryName = data.categoryName?.trim();
-  if (!resolvedCategoryId && normalizedCategoryName) {
-    const category = await prisma.category.upsert({
-      where: { name: normalizedCategoryName },
-      update: {},
-      create: { name: normalizedCategoryName },
-    });
-    resolvedCategoryId = category.id;
-  }
+  return prisma.$transaction(async (tx) => {
+    let resolvedCategoryId = data.categoryId;
+    const normalizedCategoryName = data.categoryName?.trim();
+    if (!resolvedCategoryId && normalizedCategoryName) {
+      const category = await tx.category.upsert({
+        where: { name: normalizedCategoryName },
+        update: {},
+        create: { name: normalizedCategoryName },
+      });
+      resolvedCategoryId = category.id;
+    }
 
-  return prisma.job.create({
-    data: {
-      clientId,
-      title: data.title,
-      description: data.description,
-      budget: data.budget,
-      location: data.location,
-      workMode: data.workMode,
-      experienceLevel: data.experienceLevel,
-      deadlineAt: data.deadlineAt ? new Date(data.deadlineAt) : undefined,
-      categoryId: resolvedCategoryId,
-      skills: data.skillIds
-        ? { create: data.skillIds.map((skillId) => ({ skillId })) }
-        : undefined,
-      milestones: data.milestones?.length
-        ? {
-            create: data.milestones.map((milestone) => ({
-              title: milestone.title,
-              amount: milestoneAmountFromPercent(data.budget as number, milestone.percent),
-              dueDate: milestone.dueDate ? new Date(milestone.dueDate) : undefined,
-            })),
-          }
-        : undefined,
-    },
+    let finalSkillIds: string[] | undefined;
+    if (data.skillIds && data.skillIds.length > 0) {
+      const names = data.skillIds.map(s => s.trim()).filter(Boolean);
+      const unique = Array.from(new Set(names));
+      const created = await Promise.all(
+        unique.map(name =>
+          tx.skill.upsert({
+            where: { name },
+            create: { name },
+            update: {},
+            select: { id: true },
+          })
+        )
+      );
+      finalSkillIds = created.map(c => c.id);
+    }
+
+    const job = await tx.job.create({
+      data: {
+        clientId,
+        title: data.title!,
+        description: data.description!,
+        budget: data.budget!,
+        budgetType: data.budgetType,
+        location: data.location,
+        workMode: data.workMode,
+        experienceLevel: data.experienceLevel,
+        durationText: data.durationText,
+        deadlineAt: data.deadlineAt ? new Date(data.deadlineAt) : undefined,
+        categoryId: resolvedCategoryId,
+        skills: finalSkillIds
+          ? { create: finalSkillIds.map((skillId) => ({ skillId })) }
+          : undefined,
+        milestones: data.milestones?.length
+          ? {
+              create: data.milestones.map((milestone) => ({
+                title: milestone.title,
+                amount: milestoneAmountFromPercent(data.budget as number, milestone.percent),
+                dueDate: milestone.dueDate ? new Date(milestone.dueDate) : undefined,
+              })),
+            }
+          : undefined,
+      },
+    });
+
+    await chargeUser(tx, clientId, BillingAction.POST_JOB, { referenceId: job.id });
+
+    await createNotification(clientId, "notification:job_created", {
+      title: "Tin tuyển dụng của bạn đã được đăng",
+      body: `Tin tuyển dụng "${job.title}" của bạn đã sẵn sàng nhận đề xuất.`,
+      link: `/jobs/${job.id}`,
+      category: "SYSTEM",
+      referenceId: job.id,
+    });
+
+    return job;
   });
 }
 
@@ -137,9 +174,11 @@ export async function updateJob(
     title?: string;
     description?: string;
     budget?: number;
+    budgetType?: string;
     location?: string;
     workMode?: string;
     experienceLevel?: string;
+    durationText?: string;
     deadlineAt?: string;
     categoryId?: string;
     categoryName?: string;
@@ -149,42 +188,66 @@ export async function updateJob(
 ) {
   validateMilestoneRules(data.milestones);
 
-  let resolvedCategoryId = data.categoryId;
-  const normalizedCategoryName = data.categoryName?.trim();
-  if (!resolvedCategoryId && normalizedCategoryName) {
-    const category = await prisma.category.upsert({
-      where: { name: normalizedCategoryName },
-      update: {},
-      create: { name: normalizedCategoryName },
+  return prisma.$transaction(async (tx) => {
+    let resolvedCategoryId = data.categoryId;
+    const normalizedCategoryName = data.categoryName?.trim();
+    if (!resolvedCategoryId && normalizedCategoryName) {
+      const category = await tx.category.upsert({
+        where: { name: normalizedCategoryName },
+        update: {},
+        create: { name: normalizedCategoryName },
+      });
+      resolvedCategoryId = category.id;
+    }
+
+    let finalSkillIds: string[] | undefined;
+    if (data.skillIds) {
+      const names = data.skillIds.map(s => s.trim()).filter(Boolean);
+      if (names.length > 0) {
+        const unique = Array.from(new Set(names));
+        const created = await Promise.all(
+          unique.map(name =>
+            tx.skill.upsert({
+              where: { name },
+              create: { name },
+              update: {},
+              select: { id: true },
+            })
+          )
+        );
+        finalSkillIds = created.map(c => c.id);
+      } else {
+        finalSkillIds = [];
+      }
+    }
+
+    const baseJob = await tx.job.findUnique({
+      where: { id: jobId },
+      select: { budget: true },
     });
-    resolvedCategoryId = category.id;
-  }
+    if (!baseJob) {
+      throw new Error("Job not found");
+    }
+    const effectiveBudget =
+      data.budget !== undefined && data.budget !== null ? data.budget : Number(baseJob.budget);
 
-  const baseJob = await prisma.job.findUnique({
-    where: { id: jobId },
-    select: { budget: true },
-  });
-  if (!baseJob) {
-    throw new Error("Job not found");
-  }
-  const effectiveBudget =
-    data.budget !== undefined && data.budget !== null ? data.budget : Number(baseJob.budget);
-
-  return prisma.job.update({
+    return tx.job.update({
     where: { id: jobId },
     data: {
       title: data.title,
       description: data.description,
       budget: data.budget,
+      budgetType: data.budgetType,
       location: data.location,
       workMode: data.workMode,
       experienceLevel: data.experienceLevel,
+      durationText: data.durationText,
       deadlineAt: data.deadlineAt ? new Date(data.deadlineAt) : undefined,
       categoryId: resolvedCategoryId,
-      skills: data.skillIds
+      skills: finalSkillIds !== undefined
         ? {
             deleteMany: {},
-            create: data.skillIds.map((skillId) => ({ skillId })),
+            create: finalSkillIds.map((skillId) => ({ skillId })),
           }
         : undefined,
       milestones: data.milestones
@@ -198,6 +261,7 @@ export async function updateJob(
           }
         : undefined,
     },
+  });
   });
 }
 
@@ -221,7 +285,7 @@ export async function getJobProposals(jobId: string) {
               title: true,
               bio: true,
               hourlyRate: true,
-              rating: true,
+              avgRating: true,
               completedJobs: true,
               onTimeRate: true,
             },

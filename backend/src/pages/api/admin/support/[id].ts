@@ -1,2 +1,2 @@
-import { updateSupport } from "../../../../controllers/admin.controller";
-export default updateSupport;
+import { updateTicket } from "../../../../controllers/support.controller";
+export default updateTicket;

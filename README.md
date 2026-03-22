@@ -1,206 +1,172 @@
-﻿# JobFinder - Nền tảng freelance marketplace (Demo Local)
+# 🌟 FastJob - Nền tảng Freelance Marketplace (Fullstack Next.js)
 
-JobFinder là dự án mô phỏng một nền tảng kết nối **Client** và **Freelancer** theo mô hình marketplace.
-Hệ thống hỗ trợ đầy đủ luồng chính: đăng ký/đăng nhập theo vai trò, đăng công việc, gửi đề xuất, chấp nhận đề xuất để tạo hợp đồng, milestone, chat realtime theo hợp đồng, ví và giao dịch demo, thông báo, bảng xếp hạng và gamification.
+FastJob là một dự án ứng dụng web toàn diện mô phỏng nền tảng kết nối **Client (Khách hàng)** và **Freelancer (Người làm tự do)** theo mô hình marketplace chuyên nghiệp (tương tự như Upwork, Fiverr). 
 
-## Tính năng chính
+Hệ thống cung cấp một luồng làm việc khép kín từ khâu Đăng tin tuyển dụng -> Ứng tuyển -> Ký kết Hợp đồng -> Bàn giao sản phẩm theo từng Giai đoạn (Milestone) -> Thanh toán -> Đánh giá đối tác. Đồng thời tích hợp thêm các công cụ tương tác thời gian thực như Chat, Thông báo, tích hợp Ví điện tử nội bộ, và Bảng điều khiển Quản trị toàn diện.
 
-- Xác thực JWT + phân quyền `ADMIN` / `CLIENT` / `FREELANCER`
-- Onboarding sau đăng ký theo vai trò người dùng
-- Quản lý hồ sơ freelancer/client
-- Job flow hoàn chỉnh:
-  - Client tạo công việc
-  - Freelancer gửi đề xuất
-  - Client duyệt/từ chối đề xuất
-  - Tự động tạo hợp đồng khi duyệt đề xuất
-- Milestone theo hợp đồng:
-  - Trạng thái `PENDING -> IN_PROGRESS -> SUBMITTED -> APPROVED`
-  - Thông báo khi submit/approve milestone
-- Chat realtime theo từng hợp đồng bằng Socket.IO (có xác thực)
-- Notification center + badge số lượng chưa đọc
-- Ví (wallet) và giao dịch demo: nạp/rút/ghi log DB
-- Ranking + leaderboard + cron tính điểm
-- Gamification: points, level, badge, streak, lịch sử điểm
-- Giao diện tiếng Việt có dấu, đồng bộ theo visual language của dự án
+---
 
-## Kiến trúc dự án
+## 🚀 Tính năng nổi bật
 
-Monorepo gồm 2 ứng dụng:
+### 👥 1. Quản lý Tài khoản & Phân quyền (RBAC)
+- Khung xác thực bảo mật **JWT (Access/Refresh Token)**.
+- Hỗ trợ 3 vai trò phân tách chặt chẽ: `ADMIN` / `CLIENT` / `FREELANCER`.
+- Luồng Onboarding thu thập đa dạng thông tin hồ sơ cho user mới sau khi đăng ký.
+- Quản lý Hồ sơ năng lực (Portfolio), Level, Kỹ năng, Chứng chỉ của Freelancer.
 
-- `./` : Frontend Next.js (App Router) chạy cổng `3000`
-- `./backend` : Backend API Next.js (Pages API) + Prisma chạy cổng `4000`
+### 💼 2. Luồng Công việc cốt lõi (Core Flow)
+- **Client**: Đăng tải mô tả công việc, ngân sách, yêu cầu kỹ năng.
+- **Freelancer**: Gửi Đề xuất (Proposal), Báo giá tự do.
+- **Client**: Duyệt/Từ chối đề xuất (Approve/Reject).
+- **Hệ thống**: Tự động sinh Hợp đồng điện tử kèm các Giai đoạn thanh toán (Milestones) khi Đề xuất được phê duyệt.
 
-Frontend gọi API backend qua biến môi trường `NEXT_PUBLIC_API_BASE_URL`.
+### 📈 3. Quản lý Hợp đồng & Milestone
+- Chia nhỏ dự án thành nhiều Giai đoạn (Milestones).
+- Trạng thái bám sát thực tế: `CHƯA BẮT ĐẦU` -> `ĐANG THỰC HIỆN` -> `CHỜ DUYỆT` -> `ĐÃ DUYỆT/THANH TOÁN`.
+- Luồng Giải ngân/Yêu cầu làm lại chuyên nghiệp.
 
-## Công nghệ sử dụng
+### ⚡ 4. Tương tác Thời gian thực (Real-time)
+- **Real-time Chat**: Tích hợp module nhắn tin trực tiếp trong phòng làm việc của mỗi Hợp đồng (Sử dụng Socket.io).
+- **Notification Center**: Thông báo sự kiện tự động (Push event khi có Đề xuất mới, Hợp đồng cập nhật, Có tin nhắn mới...). Có đếm số lượng chưa đọc.
 
-### Frontend
+### 🏆 5. Gamification & System Metrics
+- **Hệ thống Đánh giá**: Review sao (1-5) và nhận xét tích lũy chéo giữa Client/Freelancer sau khi hợp đồng hoàn tất.
+- **Bảng Xếp Hạng (Leaderboard)**: Top Freelancer dựa trên thu nhập, Job đúng hạn, lượt hoàn thành. Chạy tính toán nền tự động qua Node-Cron.
+- **Ranking / Streaks / Points**: Tạo tính hứng thú cày cuốc, giữ chân người dùng.
 
-- Next.js `16`
-- React `19`
-- TypeScript
-- Tailwind CSS `4`
-- Lucide React
-- Socket.IO Client
+### 💰 6. Ví nội bộ & Quản lý Giao dịch (Demo)
+- Nạp tiền (Credit) / Trừ tiền (Debit) / Thanh toán giải ngân Milestone.
+- Log chi tiết biến động số dư.
 
-### Backend
+### 🛠 7. Admin Dashboard Toàn diện
+- Giao diện Admin chuyên nghiệp Dark-mode, thống kê chỉ số Analytics như GMV, Doanh thu (Stripe-like UI).
+- Quản trị User (Khoá / Mở khoá / Xoá tài khoản).
+- Quản lý Job, Hợp đồng, Xử lý vé Yêu cầu Hỗ trợ (Support/Dispute) từ người dùng.
 
-- Next.js `14` (API)
-- Node.js + TypeScript
-- Prisma ORM
-- PostgreSQL
-- Zod (validation)
-- JWT + bcryptjs
-- Socket.IO
-- node-cron
+---
 
-## Yêu cầu môi trường
+## ⚙️ Kiến trúc & Công nghệ
 
-- Node.js `>= 20`
-- npm `>= 10`
-- PostgreSQL `>= 14`
+Dự án được ứng dụng mô hình **Monorepo** chia làm 2 thư mục chính:
 
-## Hướng dẫn cài đặt và chạy local
+*   **`./` (Frontend):** Xây dựng trên **Next.js 16 (App Router)**, Tailwind CSS 4, shadcn/ui, Framer Motion, Socket.io-client.
+*   **`./backend` (Backend API):** Xây dựng bằng **Next.js 14 (Pages API)**, PostgreSQL, **Prisma ORM**, JWT, Socket.io Server, Zod Validation, Node-Cron vòng lặp.
 
-## 1) Clone source
+Frontend gọi API tới logic backend xử lý gián tiếp qua biến môi trường độc lập.
 
+---
+
+## 📦 Hướng dẫn Cài đặt & Khởi chạy (Local)
+
+### 📋 Yêu cầu Môi trường
+- **Node.js** >= 20
+- **npm** >= 10
+- **PostgreSQL** >= 14 đang chạy ngầm trên máy.
+
+### 1️⃣ Clone mã nguồn
 ```bash
 git clone https://github.com/imk1803/TMDT.git
 cd TMDT
 ```
 
-## 2) Cài dependencies
+### 2️⃣ Cài đặt thư viện (Dependencies)
+_Gói thư viện được cấu hình tách biệt_
 
-Cài cho frontend:
-
+Cài đặt cho Frontend:
 ```bash
 npm install
 ```
 
-Cài cho backend:
-
+Cài đặt cho Backend API:
 ```bash
 cd backend
 npm install
 cd ..
 ```
 
-## 3) Cấu hình môi trường
-
-Tạo file `./.env.local`:
-
+### 3️⃣ Cấu hình Biến môi trường (.env)
+Tạo file `.env.local` ở thư mục gốc (Frontend):
 ```env
 NEXT_PUBLIC_API_BASE_URL="http://localhost:4000"
 ```
 
-Tạo file `./backend/.env` (hoặc copy từ `backend/.env.example`):
-
+Tạo file `.env` ở thư mục `backend/`:
+*(Kết nối PostgreSQL của bạn vào `DATABASE_URL`)*
 ```env
-DATABASE_URL="postgresql://postgres:admin@localhost:5432/fastworkdb"
-JWT_SECRET="replace_with_strong_secret"
-JWT_REFRESH_SECRET="replace_with_strong_refresh_secret"
+DATABASE_URL="postgresql://<USER>:<PASSWORD>@localhost:5432/fastworkdb"
+JWT_SECRET="super-strong-jwt-secret-key-development"
+JWT_REFRESH_SECRET="super-strong-refresh-secret-string"
 JWT_EXPIRES_IN="15m"
 JWT_REFRESH_EXPIRES_IN="30d"
 BCRYPT_SALT_ROUNDS="12"
+CORS_ORIGIN="http://localhost:3000"
 ```
 
-## 4) Khởi tạo database (Prisma)
+### 4️⃣ Khởi tạo Database & Dữ liệu Mẫu (Seed Data)
+Di chuyển vào backend, khởi tạo CSDL bằng Prisma và chèn Dữ liệu Mẫu có sẵn (Rất quan trọng để test hệ thống):
 
 ```bash
 cd backend
 npm run prisma:generate
 npm run prisma:migrate
-# tuỳ chọn
 npm run seed
 cd ..
 ```
 
-## 5) Chạy backend và frontend
+### 5️⃣ Khởi động Hệ thống
+Bạn cần chạy 2 Terminal song song để Server Backend và UI Frontend cùng hoạt động:
 
-Mở 2 terminal riêng:
-
-Terminal 1 (backend):
-
+**Terminal 1 (Backend - chạy ở cổng 4000):**
 ```bash
 cd backend
 npm run dev
 ```
 
-Terminal 2 (frontend):
-
+**Terminal 2 (Frontend - chạy ở cổng 3000):**
 ```bash
 npm run dev
 ```
 
-Truy cập:
-
-- Frontend: [http://localhost:3000](http://localhost:3000)
-- Backend API: [http://localhost:4000](http://localhost:4000)
-
-## Script hữu ích
-
-### Frontend (`./`)
-
-```bash
-npm run dev
-npm run build
-npm run start
-npm run lint
-npm run lint:i18n
-```
-
-### Backend (`./backend`)
-
-```bash
-npm run dev
-npm run build
-npm run start
-npm run prisma:generate
-npm run prisma:migrate
-npm run seed
-```
-
-## Lỗi thường gặp
-
-### 1) `EADDRINUSE: address already in use :::4000`
-
-Đang có backend process chạy sẵn ở cổng `4000`.
-Chỉ giữ **1 terminal backend dev** duy nhất.
-
-Windows (PowerShell):
-
-```powershell
-netstat -ano | findstr :4000
-taskkill /PID <PID> /F
-```
-
-### 2) Frontend báo CORS khi gọi `localhost:4000`
-
-- Kiểm tra backend đã chạy chưa
-- Kiểm tra đúng `NEXT_PUBLIC_API_BASE_URL` trong `.env.local`
-- Khởi động lại frontend sau khi sửa env
-
-### 3) Prisma không kết nối DB
-
-- Kiểm tra PostgreSQL đã chạy
-- Kiểm tra `DATABASE_URL`
-- Chạy lại `npm run prisma:migrate`
-
-## Lưu ý
-
-- Dự án hiện tối ưu cho **demo local**, chưa harden cho production.
-- Các luồng thanh toán/ví đang ở mức mô phỏng cập nhật DB.
-
-## Đóng góp
-
-- Tạo branch mới từ `main`
-- Commit theo từng nhóm thay đổi rõ ràng
-- Mở Pull Request mô tả đầy đủ tính năng/sửa lỗi
+Thưởng thức thành quả:
+- Trang chủ người dùng: [http://localhost:3000](http://localhost:3000)
+- Backend Endpoints: [http://localhost:4000/api/...](http://localhost:4000/api)
 
 ---
 
-Nếu bạn cần, mình có thể bổ sung thêm phần:
+## 🧪 Tài khoản Dữ liệu Test (Có sẵn nhờ npm run seed)
+Hệ thống `seed` mặc định đã tạo ra hàng chục Job, Contract, User có sẵn. Hãy dùng các thông tin dưới đây để đăng nhập và kiểm tra (Mật khẩu chung cho tất cả là: `password123`):
 
-- kiến trúc module chi tiết (diagram)
-- API docs dạng bảng endpoint
-- hướng dẫn deploy lên VPS (PM2 + Nginx + SSL)
+🔐 **Admin Toàn quyền:**
+- Email: `admin@example.com` | Pass: `password123`
+*(Vào dashboard tại `/admin/...` xem Analytics)*
+
+💼 **Tài khoản Khách Hàng (Client):**
+- Email: `client1@example.com` | Pass: `password123`
+- Email: `client2@example.com` | Pass: `password123`
+*(Đã đăng các job dự án công nghệ, có sẵn số dư ví)*
+
+👨‍💻 **Tài khoản Freelancer:**
+- Email: `freelancer1@example.com` | Pass: `password123`
+- Email: `freelancer2@example.com` | Pass: `password123`
+*(Gắn sẵn Portfolio, Rank, đang có hợp đồng dở dang)*
+
+---
+
+## 🐛 Xử lý lỗi thường gặp (Troubleshoot)
+
+**1. Lỗi cổng 4000 bị trùng (EADDRINUSE:::4000):**
+Xảy ra khi Backend Next.js bị khởi động nhiều lần hoặc ngầm. Tắt tiến trình bằng (Windows):
+```powershell
+netstat -ano | findstr :4000
+taskkill /PID <PID_VỪA_TÌM> /F
+```
+
+**2. Frontend gặp lỗi "CORS/Failed to fetch":**
+Trình duyệt chặn API vì `localhost:4000` chưa phản hồi. Hãy chắc chắn Terminal Backend đã hiện thông báo `Ready on http://localhost:4000`.
+
+**3. Prisma báo sai Database URL:**
+Đảm bảo user/password Postgres trong file `.env` là chính xác với local máy tính của bạn và database `fastworkdb` (hoặc tên tuỳ chỉnh) đã được cấp quyền khởi tạo table.
+
+---
+
+*Dự án được tối ưu hoá theo kiến trúc hiện đại để dễ dàng làm quen với mô hình Marketplace B2B/B2C.* Chúc bạn có một trải nghiệm code vui vẻ! ✨

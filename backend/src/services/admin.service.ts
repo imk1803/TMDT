@@ -49,3 +49,64 @@ export async function listSupportTickets() {
 export async function updateSupportTicket(id: string, status: "OPEN" | "IN_PROGRESS" | "RESOLVED") {
   return prisma.supportTicket.update({ where: { id }, data: { status } });
 }
+
+export async function getDashboardStats() {
+  const [totalUsers, totalJobs, activeContracts, platformRev] = await Promise.all([
+    prisma.user.count(),
+    prisma.job.count(),
+    prisma.contract.count({ where: { status: "ACTIVE" } }),
+    getPlatformRevenue()
+  ]);
+  
+  return { totalUsers, totalJobs, activeContracts, totalRevenue: platformRev };
+}
+
+export async function getPlatformRevenue() {
+  const result = await prisma.transaction.aggregate({
+    where: { category: "PLATFORM" },
+    _sum: { amount: true }
+  });
+  return Number(result._sum.amount || 0);
+}
+
+export async function getUserTransactionVolume() {
+  const result = await prisma.transaction.aggregate({
+    where: { category: "USER" },
+    _sum: { amount: true }
+  });
+  return Number(result._sum.amount || 0);
+}
+
+export async function listAllContracts() {
+  return prisma.contract.findMany({
+    include: { client: { select: { name: true, email: true } }, freelancer: { select: { name: true, email: true } } },
+    orderBy: { createdAt: "desc" }
+  });
+}
+
+export async function listAllTransactions() {
+  return prisma.transaction.findMany({
+    include: { user: { select: { name: true, email: true, role: true } } },
+    orderBy: { createdAt: "desc" }
+  });
+}
+
+export async function getAdminLeaderboard() {
+  return prisma.freelancerProfile.findMany({
+    include: {
+      user: { select: { id: true, name: true, email: true, avatarUrl: true } }
+    },
+    orderBy: { completedJobs: 'desc' },
+    take: 50
+  });
+}
+
+export async function getAdminResources() {
+  return prisma.resource.findMany({
+    include: {
+      uploader: { select: { name: true, email: true } },
+      contract: { select: { id: true } }
+    },
+    orderBy: { createdAt: 'desc' }
+  });
+}

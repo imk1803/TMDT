@@ -1,5 +1,7 @@
 import { prisma } from "../lib/prisma";
+import { chargeUser, BillingAction } from "./billing.service";
 import { HttpError } from "../utils/http";
+import { createNotification } from "./notification.service";
 
 function asNumber(value: any) {
   return Number(value ?? 0);
@@ -67,6 +69,8 @@ export async function topUpWallet(userId: string, amount: number, method?: strin
         userId,
         amount,
         type: "CREDIT",
+        category: "USER",
+        action: "TOPUP",
         description: method ? `WALLET_TOPUP_${method}` : "WALLET_TOPUP",
         balanceAfter: nextAvailable,
       },
@@ -102,6 +106,8 @@ export async function withdrawWallet(userId: string, amount: number, method?: st
         userId,
         amount,
         type: "DEBIT",
+        category: "USER",
+        action: "WITHDRAW",
         description: method ? `WALLET_WITHDRAW_${method}` : "WALLET_WITHDRAW",
         balanceAfter: nextAvailable,
       },
@@ -162,9 +168,19 @@ export async function holdEscrow(clientId: string, data: { contractId: string; a
         paymentId: payment.id,
         amount: data.amount,
         type: "DEBIT",
+        category: "USER",
+        action: "ESCROW_HOLD",
         description: "ESCROW_HELD",
         balanceAfter: nextClientAvailable,
       },
+    });
+
+    await createNotification(clientId, "notification:payment_added", {
+      title: "Đã tạm giữ thanh toán",
+      body: `Khoản thanh toán ${data.amount.toLocaleString("vi-VN")} VND đã được tạm giữ an toàn.`,
+      link: `/contracts/${data.contractId}`,
+      category: "PAYMENT",
+      referenceId: payment.id,
     });
 
     return payment;
@@ -181,6 +197,12 @@ export async function releaseEscrow(actorId: string, actorRole: string, paymentI
             id: true,
             clientId: true,
             freelancerId: true,
+            supportTickets: {
+              where: {
+                type: "DISPUTE",
+                status: { in: ["OPEN", "IN_PROGRESS"] },
+              },
+            },
           },
         },
       },
@@ -189,6 +211,10 @@ export async function releaseEscrow(actorId: string, actorRole: string, paymentI
     if (!payment) throw new HttpError(404, "Payment not found");
     if (payment.escrowStatus !== "HELD") {
       throw new HttpError(400, "Payment is not in HELD state");
+    }
+
+    if (payment.contract.supportTickets && payment.contract.supportTickets.length > 0) {
+      throw new HttpError(400, "Không thể giải ngân khi hợp đồng đang có Khiếu nại (Dispute) chưa giải quyết.");
     }
 
     const canRelease = actorRole === "ADMIN" || payment.contract.clientId === actorId;
@@ -240,9 +266,24 @@ export async function releaseEscrow(actorId: string, actorRole: string, paymentI
         paymentId: payment.id,
         amount,
         type: "CREDIT",
+        category: "USER",
+        action: "ESCROW_RELEASE",
         description: "ESCROW_RELEASED",
         balanceAfter: nextFreelancerAvailable,
       },
+    });
+
+    await chargeUser(tx, payment.contract.freelancerId, BillingAction.RELEASE_PAYMENT, { 
+      referenceId: paymentId, 
+      amountOverride: amount * 0.1 
+    });
+
+    await createNotification(payment.contract.freelancerId, "notification:payment_released", {
+      title: "Thanh toán đã được giải ngân",
+      body: `Bạn đã nhận được khoản thanh toán ${amount.toLocaleString("vi-VN")} VND.`,
+      link: `/contracts/${payment.contract.id}`,
+      category: "PAYMENT",
+      referenceId: payment.id,
     });
 
     return updatedPayment;

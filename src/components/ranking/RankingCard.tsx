@@ -1,4 +1,4 @@
-﻿import Image from "next/image";
+import Image from "next/image";
 import { Award, Bolt, Paintbrush2, Star, Timer, Wand2 } from "lucide-react";
 import type { Freelancer } from "@/types/freelancer";
 import {
@@ -127,7 +127,7 @@ export function RankingCard({
             </p>
             <p className="mt-1 inline-flex items-center gap-1 font-semibold text-slate-900 sm:justify-center">
               <Timer className="h-4 w-4 text-sky-500" />
-              {freelancer.onTimeRate}%
+              {Math.round(freelancer.onTimeRate)}%
             </p>
           </div>
         </div>

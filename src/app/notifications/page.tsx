@@ -41,7 +41,7 @@ export default function NotificationsPage() {
   const [loadingData, setLoadingData] = useState(true);
   const [markingAll, setMarkingAll] = useState(false);
 
-  const unreadCount = useMemo(() => items.filter((n) => !n.readAt).length, [items]);
+  const unreadCount = useMemo(() => items.filter((n) => !n.isRead).length, [items]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -64,7 +64,7 @@ export default function NotificationsPage() {
         if (!cancelled) {
           const nextItems = res.notifications || [];
           setItems(nextItems);
-          emitUnreadCount(nextItems.filter((n) => !n.readAt).length);
+          emitUnreadCount(nextItems.filter((n) => !n.isRead).length);
         }
       } catch (err: any) {
         if (!cancelled) {
@@ -106,7 +106,7 @@ export default function NotificationsPage() {
     try {
       await markAllNotificationsRead();
       setItems((prev) => {
-        const next = prev.map((n) => ({ ...n, readAt: n.readAt || new Date().toISOString() }));
+        const next = prev.map((n) => ({ ...n, isRead: true, readAt: n.readAt || new Date().toISOString() }));
         emitUnreadCount(0);
         return next;
       });
@@ -131,9 +131,9 @@ export default function NotificationsPage() {
       await markNotificationRead(id);
       setItems((prev) => {
         const next = prev.map((n) =>
-          n.id === id ? { ...n, readAt: n.readAt || new Date().toISOString() } : n
+          n.id === id ? { ...n, isRead: true, readAt: n.readAt || new Date().toISOString() } : n
         );
-        emitUnreadCount(next.filter((n) => !n.readAt).length);
+        emitUnreadCount(next.filter((n) => !n.isRead).length);
         return next;
       });
     } catch (err: any) {
@@ -146,7 +146,7 @@ export default function NotificationsPage() {
   }
 
   async function handleOpenNotification(item: AppNotification) {
-    if (!item.readAt) {
+    if (!item.isRead) {
       try {
         await markNotificationRead(item.id);
       } catch {
@@ -155,9 +155,9 @@ export default function NotificationsPage() {
 
       setItems((prev) => {
         const next = prev.map((n) =>
-          n.id === item.id ? { ...n, readAt: n.readAt || new Date().toISOString() } : n
+          n.id === item.id ? { ...n, isRead: true, readAt: n.readAt || new Date().toISOString() } : n
         );
-        emitUnreadCount(next.filter((n) => !n.readAt).length);
+        emitUnreadCount(next.filter((n) => !n.isRead).length);
         return next;
       });
     }
@@ -233,7 +233,7 @@ export default function NotificationsPage() {
                 role="button"
                 tabIndex={0}
                 className={`w-full rounded-2xl border p-4 text-left transition-colors hover:border-sky-200 hover:bg-sky-50 ${
-                  item.readAt
+                  item.isRead
                     ? "border-slate-200 bg-slate-50/60"
                     : "border-sky-200 bg-sky-50/70"
                 }`}
@@ -244,7 +244,7 @@ export default function NotificationsPage() {
                     <p className="mt-1 text-sm text-slate-600">{item.body}</p>
                     <p className="mt-2 text-xs text-slate-500">{formatTime(item.createdAt)}</p>
                   </div>
-                  {!item.readAt && (
+                  {!item.isRead && (
                     <Button
                       size="sm"
                       variant="secondary"

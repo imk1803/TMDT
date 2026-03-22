@@ -1,4 +1,4 @@
-﻿import type { Freelancer } from "@/types/freelancer";
+import type { Freelancer } from "@/types/freelancer";
 import { apiFetch } from "./api";
 
 export async function fetchFreelancersForSelect(): Promise<Freelancer[]> {
@@ -13,7 +13,7 @@ export async function fetchFreelancersForSelect(): Promise<Freelancer[]> {
       "Công nghệ thông tin",
     completedJobs: f.freelancerProfile?.completedJobs || 0,
     totalIncome: Number(f.freelancerProfile?.totalIncome || 0),
-    rating: f.freelancerProfile?.rating || 0,
+    rating: f.freelancerProfile?.avgRating || 0,
     onTimeRate: f.freelancerProfile?.onTimeRate ?? 0,
   }));
 }

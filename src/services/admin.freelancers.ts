@@ -1,4 +1,4 @@
-﻿import type { Freelancer } from "@/types/freelancer";
+import type { Freelancer } from "@/types/freelancer";
 import { apiFetch } from "./api";
 import { getAccessToken } from "./storage";
 
@@ -18,9 +18,9 @@ export async function adminFetchFreelancers(): Promise<Freelancer[]> {
       "Công nghệ thông tin",
     completedJobs: f.freelancerProfile?.completedJobs || 0,
     totalIncome: Number(f.freelancerProfile?.totalIncome || 0),
-    rating: f.freelancerProfile?.rating || 0,
+    rating: f.freelancerProfile?.avgRating || 0,
     onTimeRate: f.freelancerProfile?.onTimeRate ?? 90,
-    currentRank: f.freelancerProfile?.rating ? 1 : undefined,
+    currentRank: f.freelancerProfile?.avgRating ? 1 : undefined,
   }));
 }
 
@@ -32,7 +32,7 @@ export async function adminCreateFreelancer(payload: {
   hourlyRate?: number;
   completedJobs?: number;
   totalIncome?: number;
-  rating?: number;
+  avgRating?: number;
   onTimeRate?: number;
 }) {
   const token = getAccessToken();
@@ -49,7 +49,7 @@ export async function adminUpdateFreelancer(id: string, payload: {
   hourlyRate?: number;
   completedJobs?: number;
   totalIncome?: number;
-  rating?: number;
+  avgRating?: number;
   onTimeRate?: number;
 }) {
   const token = getAccessToken();

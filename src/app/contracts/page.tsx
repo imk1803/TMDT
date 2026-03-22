@@ -34,7 +34,9 @@ export default function ContractsPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
   const { push } = useToast();
-  const [contracts, setContracts] = useState<ContractRow[]>([]);
+  const [activeContracts, setActiveContracts] = useState<ContractRow[]>([]);
+  const [completedContracts, setCompletedContracts] = useState<ContractRow[]>([]);
+  const [activeTab, setActiveTab] = useState<"ACTIVE" | "COMPLETED">("ACTIVE");
   const [loadingData, setLoadingData] = useState(true);
 
   useEffect(() => {
@@ -51,14 +53,14 @@ export default function ContractsPage() {
       try {
         const res = await fetchMyContracts();
         if (!cancelled) {
-          const active = ((res.contracts || []) as ContractRow[]).filter(
-            (c) => c.status === "ACTIVE"
-          );
-          setContracts(active);
+          const all = (res.contracts || []) as ContractRow[];
+          setActiveContracts(all.filter((c) => c.status === "ACTIVE"));
+          setCompletedContracts(all.filter((c) => c.status === "COMPLETED"));
         }
       } catch (err: any) {
         if (!cancelled) {
-          setContracts([]);
+          setActiveContracts([]);
+          setCompletedContracts([]);
           push({
             title: "Không tải được hợp đồng",
             description: err?.message || "Vui lòng thử lại.",
@@ -76,13 +78,7 @@ export default function ContractsPage() {
     };
   }, [push, user]);
 
-  const title = useMemo(
-    () =>
-      user?.role === "FREELANCER"
-        ? "Hợp đồng đang thực hiện của tôi"
-        : "Hợp đồng đang thực hiện",
-    [user?.role]
-  );
+  const title = useMemo(() => "Hợp đồng của tôi", []);
 
   if (loading || loadingData) {
     return (
@@ -104,11 +100,30 @@ export default function ContractsPage() {
         <div className="rounded-3xl border border-sky-100 bg-white p-6 shadow-sm shadow-sky-100">
           <h1 className="text-xl font-semibold text-slate-900">{title}</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Danh sách các hợp đồng đang ở trạng thái hoạt động.
+            Xem và quản lý các hợp đồng dự án của bạn trên nền tảng.
           </p>
 
+          <div className="mt-6 flex gap-2 border-b border-slate-100 pb-4">
+             <button
+                onClick={() => setActiveTab("ACTIVE")}
+                className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
+                  activeTab === "ACTIVE" ? "bg-blue-100 text-blue-700 shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+             >
+                Đang thực hiện ({activeContracts.length})
+             </button>
+             <button
+                onClick={() => setActiveTab("COMPLETED")}
+                className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
+                  activeTab === "COMPLETED" ? "bg-emerald-100 text-emerald-700 shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+             >
+                Đã hoàn thành ({completedContracts.length})
+             </button>
+          </div>
+
           <div className="mt-5 space-y-3">
-            {contracts.map((contract) => {
+            {(activeTab === "ACTIVE" ? activeContracts : completedContracts).map((contract) => {
               const partnerName =
                 user.role === "CLIENT"
                   ? contract.freelancer?.name || contract.freelancer?.id || "Freelancer"
@@ -121,27 +136,38 @@ export default function ContractsPage() {
                 <Link
                   key={contract.id}
                   href={`/contracts/${contract.id}`}
-                  className="block rounded-2xl border border-slate-100 bg-slate-50/70 p-4 transition-colors hover:border-sky-200 hover:bg-sky-50/70"
+                  className={`block rounded-2xl border p-4 transition hover:-translate-y-0.5 hover:shadow-md ${activeTab === "COMPLETED" ? "border-slate-100 bg-slate-50/50 hover:border-slate-300 opacity-80 grayscale-[20%]" : "border-blue-100 bg-white hover:border-blue-300 shadow-sm"}`}
                 >
-                  <p className="text-sm font-semibold text-slate-900">
-                    {contract.job?.title || `Hợp đồng ${contract.id}`}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Đối tác: {partnerName}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Giá trị: {Number(contract.price).toLocaleString("vi-VN")} VNĐ
-                    {contract.dueAt
-                      ? ` · Deadline: ${new Date(contract.dueAt).toLocaleDateString("vi-VN")}`
-                      : ""}
-                  </p>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className={`text-sm font-bold ${activeTab === "COMPLETED" ? "text-slate-700" : "text-slate-900"}`}>
+                        {contract.job?.title || `Hợp đồng ${contract.id}`}
+                      </p>
+                      <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                        Đối tác: <span className="text-slate-700">{partnerName}</span>
+                      </p>
+                    </div>
+                    {activeTab === "COMPLETED" ? (
+                      <span className="rounded bg-emerald-100/80 px-2.5 py-1 text-xs font-bold uppercase text-emerald-600">Đã kết thúc</span>
+                    ) : (
+                      <span className="rounded bg-blue-100/80 px-2.5 py-1 text-xs font-bold uppercase text-blue-600">Đang triển khai</span>
+                    )}
+                  </div>
+                  <div className="mt-3 flex items-center justify-between text-xs">
+                    <p className="font-semibold text-slate-700">
+                      Ngân sách: <span className={activeTab === "COMPLETED" ? "text-slate-500" : "text-blue-600"}>{Number(contract.price).toLocaleString("vi-VN")}đ</span>
+                    </p>
+                    {contract.dueAt && (
+                      <p className="text-slate-500 font-medium">Hạn chót: {new Date(contract.dueAt).toLocaleDateString("vi-VN")}</p>
+                    )}
+                  </div>
                 </Link>
               );
             })}
 
-            {contracts.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500">
-                Hiện chưa có hợp đồng đang thực hiện.
+            {(activeTab === "ACTIVE" ? activeContracts : completedContracts).length === 0 && (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500 font-medium">
+                {activeTab === "ACTIVE" ? "Hiện chưa có hợp đồng đang thực hiện." : "Bạn chưa có hợp đồng nào được lưu trữ hoàn thành."}
               </div>
             )}
           </div>

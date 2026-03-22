@@ -75,9 +75,12 @@ export default async function stream(req: NextApiRequest, res: SseResponse) {
 
   await sendUnread();
 
-  const onChanged = async (payload: { userId: string }) => {
+  const onChanged = async (payload: { userId: string, notification?: any }) => {
     if (payload.userId !== user.id) return;
     await sendUnread();
+    if (payload.notification) {
+      sendEvent(res, "new_notification", payload.notification);
+    }
   };
 
   notificationBus.on("notifications:changed", onChanged);

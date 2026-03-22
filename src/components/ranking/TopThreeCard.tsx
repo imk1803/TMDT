@@ -1,4 +1,4 @@
-﻿import Image from "next/image";
+import Image from "next/image";
 import { Award, Bolt, Medal, Paintbrush2, Star, Wand2 } from "lucide-react";
 import type { Freelancer } from "@/types/freelancer";
 import {
@@ -150,7 +150,7 @@ export function TopThreeCard({ freelancer, rank, mode }: TopThreeCardProps) {
         <div className="rounded-2xl border border-sky-100 bg-white/70 p-3">
           <p className="text-xs font-semibold text-slate-600">Đúng hạn</p>
           <p className="mt-0.5 text-base font-semibold text-slate-900">
-            {freelancer.onTimeRate}%
+            {Math.round(freelancer.onTimeRate)}%
           </p>
         </div>
       </div>

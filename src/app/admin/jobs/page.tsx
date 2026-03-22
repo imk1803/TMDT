@@ -29,6 +29,7 @@ export default function AdminJobsPage() {
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Job | null>(null);
   const [viewing, setViewing] = useState<Job | null>(null);
+  const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [sortBy, setSortBy] = useState<JobSortField>("title");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -180,11 +181,11 @@ export default function AdminJobsPage() {
     }
   };
 
-  const handleDelete = async (job: Job) => {
-    if (!confirm(`Xoá tin tuyển dụng "${job.title}"?`)) return;
+  const confirmDelete = async () => {
+    if (!jobToDelete) return;
     try {
-      await deleteJob(job.id);
-      setJobs((prev) => prev.filter((j) => j.id !== job.id));
+      await deleteJob(jobToDelete.id);
+      setJobs((prev) => prev.filter((j) => j.id !== jobToDelete.id));
       push({
         title: "Job deleted",
         description: "Removed from database.",
@@ -196,6 +197,8 @@ export default function AdminJobsPage() {
         description: err?.message || "Không thể xoá tin.",
         variant: "error",
       });
+    } finally {
+      setJobToDelete(null);
     }
   };
 
@@ -239,9 +242,9 @@ export default function AdminJobsPage() {
         }
       />
 
-      <div className="rounded-3xl border border-sky-100 bg-white p-5 shadow-sm shadow-sky-100">
+      <div className="rounded-3xl border border-zinc-800/40 bg-[#09090B] p-6 sm:p-8 shadow-sm shadow-zinc-950/50">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex-1">
+          <div className="flex-1 w-full max-w-md">
             <Input
               label="Tìm kiếm"
               value={q}
@@ -250,11 +253,12 @@ export default function AdminJobsPage() {
                 setPage(1);
               }}
               placeholder="VD: React, Hà Nội, Remote..."
+              className="bg-zinc-900 border-zinc-700 text-white"
             />
           </div>
-          <div className="flex flex-col items-end gap-2 text-xs text-slate-500 sm:text-sm">
+          <div className="flex flex-col items-end gap-2 text-xs text-zinc-400 sm:text-sm">
             <div className="flex items-center gap-2">
-              <span className="hidden text-[11px] text-slate-500 sm:inline">
+              <span className="hidden text-[11px] text-zinc-500 sm:inline">
                 Sắp xếp:
               </span>
               <select
@@ -262,7 +266,7 @@ export default function AdminJobsPage() {
                 onChange={(e) =>
                   setSortBy(e.target.value as JobSortField)
                 }
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 shadow-sm outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-200"
+                className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-300 shadow-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50"
               >
                 <option value="title">Theo vị trí</option>
                 <option value="company">Theo công ty</option>
@@ -272,7 +276,7 @@ export default function AdminJobsPage() {
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-7 px-2 text-[11px] text-slate-600 hover:bg-slate-100"
+                className="h-8 px-3 text-[11px] text-zinc-400 hover:bg-zinc-800 hover:text-white"
                 onClick={() =>
                   setSortDir((d) => (d === "asc" ? "desc" : "asc"))
                 }
@@ -282,7 +286,7 @@ export default function AdminJobsPage() {
             </div>
             <div>
               Tìm thấy{" "}
-              <span className="font-semibold text-slate-900">
+              <span className="font-semibold text-white">
                 {loading ? 0 : sorted.length}
               </span>{" "}
               tin · Trang {currentPage}/{totalPages}
@@ -290,9 +294,9 @@ export default function AdminJobsPage() {
           </div>
         </div>
 
-        <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div className="overflow-hidden rounded-2xl border border-zinc-800/40 bg-[#050505]/50">
           <table className="w-full text-left text-sm">
-            <thead className="bg-sky-50 text-xs uppercase tracking-wide text-slate-600">
+            <thead className="bg-[#050505] text-xs uppercase tracking-widest text-zinc-500 border-b border-zinc-800/40 font-semibold">
               <tr>
                 <th className="px-4 py-3">Vị trí</th>
                 <th className="hidden px-4 py-3 md:table-cell">Công ty</th>
@@ -301,52 +305,38 @@ export default function AdminJobsPage() {
                 <th className="px-4 py-3 text-right">Hành động</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-zinc-800/60">
               {paginated.map((job) => (
-                <tr key={job.id} className="bg-white hover:bg-sky-50/60">
+                <tr key={job.id} className="hover:bg-zinc-800/40 transition-colors">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-slate-900">{job.title}</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      <span className="inline-flex items-center gap-1">
+                    <p className="font-medium text-zinc-200">{job.title}</p>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      <span className="inline-flex items-center gap-1.5">
                         <Search className="h-3.5 w-3.5" />
                         {job.tags.slice(0, 3).join(", ")}
                       </span>
                     </p>
                   </td>
-                  <td className="hidden px-4 py-3 text-slate-700 md:table-cell">
+                  <td className="hidden px-4 py-3 text-zinc-300 md:table-cell">
                     {job.companyName}
                   </td>
-                  <td className="hidden px-4 py-3 text-slate-700 lg:table-cell">
+                  <td className="hidden px-4 py-3 text-zinc-400 lg:table-cell">
                     {job.location}
                   </td>
-                  <td className="hidden px-4 py-3 text-slate-700 lg:table-cell">
+                  <td className="hidden px-4 py-3 text-zinc-400 lg:table-cell">
                     {job.workMode}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-slate-600 hover:bg-sky-50"
-                        onClick={() => setViewing(job)}
-                      >
-                        Xem
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => openEditModal(job)}
-                      >
-                        Sửa
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-rose-600 hover:bg-rose-50 hover:text-rose-700"
-                        onClick={() => handleDelete(job)}
-                      >
-                        Xoá
-                      </Button>
+                       <Button size="sm" variant="ghost" className="text-zinc-400 hover:text-white" onClick={() => setViewing(job)}>
+                          Xem
+                       </Button>
+                       <Button size="sm" variant="ghost" className="text-zinc-400 hover:text-indigo-400" onClick={() => openEditModal(job)}>
+                          Sửa
+                       </Button>
+                       <Button size="sm" variant="ghost" className="text-rose-500 hover:bg-rose-500/10 hover:text-rose-400" onClick={() => setJobToDelete(job)}>
+                         Xóa
+                       </Button>
                     </div>
                   </td>
                 </tr>
@@ -356,7 +346,7 @@ export default function AdminJobsPage() {
                 <tr>
                   <td
                     colSpan={5}
-                    className="px-4 py-10 text-center text-sm text-slate-300"
+                    className="px-4 py-10 text-center text-sm text-zinc-500"
                   >
                     Không có dữ liệu phù hợp với từ khóa hiện tại.
                   </td>
@@ -404,11 +394,11 @@ export default function AdminJobsPage() {
         )}
 
         {(isModalOpen || viewing) && (
-          <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 px-4">
-            <div className="w-full max-w-lg rounded-3xl border border-sky-100 bg-white p-6 shadow-2xl shadow-sky-200">
-              <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-[#09090b]/80 px-4 backdrop-blur-sm">
+            <div className="w-full max-w-lg rounded-2xl border border-zinc-800 bg-zinc-950 p-6 shadow-2xl">
+              <div className="mb-6 flex items-center justify-between gap-3 border-b border-zinc-800 pb-4">
                 <div>
-                  <p className="text-sm font-semibold text-slate-900">
+                  <p className="text-lg font-bold text-white">
                     {viewing
                       ? "Chi tiết tin tuyển dụng"
                       : editing
@@ -416,13 +406,13 @@ export default function AdminJobsPage() {
                       : "Thêm tin tuyển dụng"}
                   </p>
                   {!viewing && (
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-zinc-400 mt-1">
                       Dữ liệu chỉ được lưu trong bộ nhớ trình duyệt (demo).
                     </p>
                   )}
                 </div>
                 <button
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-100"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors"
                   onClick={() => {
                     setIsModalOpen(false);
                     setViewing(null);
@@ -433,64 +423,64 @@ export default function AdminJobsPage() {
               </div>
 
               {viewing ? (
-                <div className="space-y-3 text-sm text-slate-700">
+                <div className="space-y-3 text-sm text-zinc-300">
                   <div>
-                    <p className="text-xs font-semibold uppercase text-slate-500">
+                    <p className="text-xs font-semibold uppercase text-zinc-500">
                       Vị trí
                     </p>
-                    <p className="mt-0.5 text-sm font-semibold text-slate-900">
+                    <p className="mt-0.5 text-sm font-semibold text-white">
                       {viewing.title}
                     </p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
-                      <p className="text-xs font-semibold uppercase text-slate-500">
+                      <p className="text-xs font-semibold uppercase text-zinc-500">
                         Công ty
                       </p>
-                      <p className="mt-0.5 text-sm text-slate-800">
+                      <p className="mt-0.5 text-sm text-zinc-300">
                         {viewing.companyName}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold uppercase text-slate-500">
+                      <p className="text-xs font-semibold uppercase text-zinc-500">
                         Địa điểm
                       </p>
-                      <p className="mt-0.5 text-sm text-slate-800">
+                      <p className="mt-0.5 text-sm text-zinc-300">
                         {viewing.location}
                       </p>
                     </div>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
-                      <p className="text-xs font-semibold uppercase text-slate-500">
+                      <p className="text-xs font-semibold uppercase text-zinc-500">
                         Hình thức làm việc
                       </p>
-                      <p className="mt-0.5 text-sm text-slate-800">
+                      <p className="mt-0.5 text-sm text-zinc-300">
                         {viewing.workMode}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold uppercase text-slate-500">
+                      <p className="text-xs font-semibold uppercase text-zinc-500">
                         Loại công việc
                       </p>
-                      <p className="mt-0.5 text-sm text-slate-800">
+                      <p className="mt-0.5 text-sm text-zinc-300">
                         {viewing.type}
                       </p>
                     </div>
                   </div>
                   <div>
-                    <p className="text-xs font-semibold uppercase text-slate-500">
+                    <p className="text-xs font-semibold uppercase text-zinc-500">
                       Kỹ năng/Từ khoá
                     </p>
-                    <p className="mt-0.5 text-sm text-slate-800">
+                    <p className="mt-0.5 text-sm text-zinc-300">
                       {viewing.tags.join(", ")}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs font-semibold uppercase text-slate-500">
+                    <p className="text-xs font-semibold uppercase text-zinc-500">
                       Mô tả
                     </p>
-                    <p className="mt-0.5 whitespace-pre-line text-sm text-slate-800">
+                    <p className="mt-0.5 whitespace-pre-line text-sm text-zinc-300">
                       {viewing.description}
                     </p>
                   </div>
@@ -578,6 +568,35 @@ export default function AdminJobsPage() {
           </div>
         )}
       </div>
+
+      {jobToDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#09090b]/80 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-950 p-6 shadow-2xl text-center">
+             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20">
+               <X className="h-6 w-6" />
+             </div>
+             <h3 className="text-lg font-bold text-white mb-2">Xác nhận xoá</h3>
+             <p className="text-sm text-zinc-400 mb-6">
+                Bạn có chắc chắn muốn xoá tin tuyển dụng <br/><strong className="text-zinc-200">{jobToDelete.title}</strong>? Hành động này không thể hoàn tác.
+             </p>
+             <div className="flex justify-center gap-3">
+               <Button
+                 variant="ghost"
+                 onClick={() => setJobToDelete(null)}
+                 className="text-zinc-400 hover:bg-zinc-800 hover:text-white"
+               >
+                 Huỷ bỏ
+               </Button>
+               <Button 
+                 onClick={confirmDelete}
+                 className="bg-rose-600 hover:bg-rose-700 text-white border border-rose-500"
+               >
+                 Xoá tin
+               </Button>
+             </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

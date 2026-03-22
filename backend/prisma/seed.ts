@@ -5,10 +5,14 @@ const prisma = new PrismaClient();
 
 console.log("SEED START");
 
+function randomDate(start: Date, end: Date) {
+  return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
+}
+
 async function main() {
   console.log("Seeding: reset data...");
-  // Reset data in correct order
   await prisma.review.deleteMany();
+  await prisma.milestone.deleteMany();
   await prisma.contract.deleteMany();
   await prisma.proposal.deleteMany();
   await prisma.jobSkill.deleteMany();
@@ -37,159 +41,212 @@ async function main() {
 
   const admin = await prisma.user.create({
     data: {
-      name: "Admin",
+      name: "Admin Platform",
       email: "admin@example.com",
       passwordHash,
       role: "ADMIN",
     },
   });
-  console.log("Admin created:", admin.email);
 
   console.log("Seeding: creating clients...");
   const clients = await Promise.all(
-    ["client1", "client2", "client3"].map((name, i) =>
+    Array.from({ length: 15 }).map((_, i) =>
       prisma.user.create({
         data: {
-          name: `Client ${i + 1}`,
-          email: `${name}@example.com`,
+          name: `Client CEO ${i + 1}`,
+          email: `client${i + 1}@example.com`,
           passwordHash,
           role: "CLIENT",
-          clientProfile: { create: { companyName: `Company ${i + 1}` } },
+          avatarUrl: `https://i.pravatar.cc/150?img=${i + 50}`,
+          clientProfile: { create: { companyName: `Tech Corp ${i + 1}` } },
         },
       })
     )
   );
-  console.log("Clients created:", clients.length);
+
+  console.log("Seeding: creating categories and skills...");
+  const categories = await prisma.category.createManyAndReturn({
+    data: [{ name: "Web Development" }, { name: "Mobile Apps" }, { name: "Design & UX" }, { name: "AI & Machine Learning" }, { name: "Marketing & Truyền thông" }, { name: "Viết lách & Nội dung" }],
+    skipDuplicates: true,
+  });
+
+  const skills = await prisma.skill.createManyAndReturn({
+    data: [{ name: "React" }, { name: "Node.js" }, { name: "Python" }, { name: "Figma" }, { name: "SEO" }, { name: "Copywriting" }],
+    skipDuplicates: true,
+  });
 
   console.log("Seeding: creating freelancers...");
   const freelancers = await Promise.all(
-    ["freelancer1", "freelancer2", "freelancer3", "freelancer4", "freelancer5"].map(
-      (name, i) =>
-        prisma.user.create({
-          data: {
-            name: `Freelancer ${i + 1}`,
-            email: `${name}@example.com`,
-            passwordHash,
-            role: "FREELANCER",
-            freelancerProfile: { create: { title: "Full-stack Dev", hourlyRate: 25 + i } },
+    Array.from({ length: 30 }).map((_, i) =>
+      prisma.user.create({
+        data: {
+          name: `Freelancer Pro ${i + 1}`,
+          email: `freelancer${i + 1}@example.com`,
+          passwordHash,
+          role: "FREELANCER",
+          avatarUrl: `https://i.pravatar.cc/150?img=${i + 1}`,
+          freelancerProfile: { 
+            create: { 
+              title: ["Senior Web Developer", "UI/UX Designer", "Marketing Expert", "AI Engineer", "Content Writer"][i % 5], 
+              hourlyRate: 30 + (i % 5)*10,
+              completedJobs: 50 + i * 2,
+              totalIncome: 45000000 + i * 3000000,
+              avgRating: 4.5 + (Math.random() * 0.5),
+              onTimeRate: 90 + (Math.random() * 10),
+              categories: {
+                create: [
+                  { categoryId: categories[i % categories.length].id }
+                ]
+              }
+            } 
           },
-        })
+        },
+      })
     )
   );
-  console.log("Freelancers created:", freelancers.length);
 
-  console.log("Seeding: creating categories...");
-  const categories = await prisma.category.createMany({
-    data: [
-      { name: "Web Development" },
-      { name: "Design" },
-      { name: "Marketing" },
-    ],
-    skipDuplicates: true,
-  });
-  console.log("Categories created:", categories.count);
+  console.log("Seeding: Wallets...");
+  const users = [...clients, ...freelancers];
+  for (const u of users) {
+    await prisma.wallet.create({
+      data: { userId: u.id, availableBalance: Math.floor(Math.random() * 50000000), heldBalance: Math.floor(Math.random() * 10000000) }
+    });
+  }
 
-  console.log("Seeding: creating skills...");
-  const skills = await prisma.skill.createMany({
-    data: [
-      { name: "React" },
-      { name: "Node.js" },
-      { name: "UI/UX" },
-      { name: "SEO" },
-    ],
-    skipDuplicates: true,
-  });
-  console.log("Skills created:", skills.count);
-
-  const categoryList = await prisma.category.findMany();
-  const skillList = await prisma.skill.findMany();
+  // Categories and Skills moved above
 
   console.log("Seeding: creating jobs...");
-  const jobs = [] as any[];
-  for (let i = 0; i < 10; i++) {
+  const jobs = [];
+  for (let i = 0; i < 40; i++) {
     const client = clients[i % clients.length];
     const job = await prisma.job.create({
       data: {
         clientId: client.id,
-        title: `Project ${i + 1}`,
-        description: "Build a feature for the marketplace",
-        budget: 500 + i * 50,
-        categoryId: categoryList[i % categoryList.length]?.id,
-        skills: {
-          create: [{ skillId: skillList[i % skillList.length].id }],
-        },
+        title: `Project ${i + 1}: ${['Build E-commerce', 'Fix Bugs', 'Design Landing Page', 'Train AI Model'][i % 4]}`,
+        description: "Need an expert to deliver high quality results fast.",
+        budget: 5000000 + i * 500000,
+        categoryId: categories[i % categories.length]?.id,
+        status: i % 5 === 0 ? "CANCELLED" : "OPEN",
+        skills: { create: [{ skillId: skills[i % skills.length].id }] },
       },
     });
     jobs.push(job);
   }
-  console.log("Jobs created:", jobs.length);
 
   console.log("Seeding: creating proposals...");
-  const proposals = [] as any[];
-  for (let i = 0; i < 20; i++) {
+  const proposals = [];
+  for (let i = 0; i < 100; i++) {
     const job = jobs[i % jobs.length];
     const freelancer = freelancers[i % freelancers.length];
     const proposal = await prisma.proposal.create({
       data: {
         jobId: job.id,
         freelancerId: freelancer.id,
-        coverLetter: "I can deliver fast and high quality.",
-        bidAmount: 400 + i * 20,
+        coverLetter: "I have 5 years of experience in this exact stack.",
+        bidAmount: job.budget ? Number(job.budget) * 0.9 : 1000000,
+        status: i % 10 === 0 ? "ACCEPTED" : (i % 5 === 0 ? "REJECTED" : "PENDING")
       },
     });
     proposals.push(proposal);
   }
-  console.log("Proposals created:", proposals.length);
 
-  console.log("Seeding: creating contracts...");
-  const contracts = [] as any[];
-  for (let i = 0; i < 5; i++) {
-    const proposal = proposals[i];
+  console.log("Seeding: creating contracts and milestones...");
+  const contracts = [];
+  for (let i = 0; i < 30; i++) {
+    const proposal = proposals[i % proposals.length];
     const job = jobs.find((j) => j.id === proposal.jobId)!;
+    const isCompleted = i % 3 === 0;
     const contract = await prisma.contract.create({
       data: {
         jobId: job.id,
         clientId: job.clientId,
         freelancerId: proposal.freelancerId,
         price: proposal.bidAmount,
-        status: "ACTIVE",
+        status: isCompleted ? "COMPLETED" : "ACTIVE",
       },
     });
     contracts.push(contract);
-  }
-  console.log("Contracts created:", contracts.length);
 
-  console.log("Seeding: creating reviews...");
-  for (let i = 0; i < 10; i++) {
-    const contract = contracts[i % contracts.length];
-    await prisma.review.create({
+    // Milestones
+    await prisma.milestone.create({
       data: {
         contractId: contract.id,
-        reviewerId: contract.clientId,
-        revieweeId: contract.freelancerId,
-        rating: 4,
-        comment: "Great work",
-      },
+        title: "Phase 1: Setup & Design",
+        amount: Number(contract.price) * 0.4,
+        status: isCompleted ? "APPROVED" : "IN_PROGRESS"
+      }
     });
-  }
-  console.log("Reviews created: 10");
 
-  console.log("Seeding: creating admin action...");
-  await prisma.adminAction.create({
-    data: {
-      adminId: admin.id,
-      action: "OTHER",
-      targetType: "USER",
-      targetId: clients[0].id,
-      note: "Seeded admin action",
-    },
-  });
-  console.log("Admin action created");
+    if (isCompleted) {
+       await prisma.review.create({
+         data: {
+           contractId: contract.id,
+           reviewerId: contract.clientId,
+           revieweeId: contract.freelancerId,
+           rating: 4 + Math.random(),
+           comment: "Excellent work, highly recommend!",
+         },
+       });
+    }
+  }
+
+  console.log("Seeding: Transactions (SaaS KPI Generator)...");
+  const now = new Date();
+  const past60Days = new Date();
+  past60Days.setDate(now.getDate() - 60);
+
+  const transactionsData = [];
+  for (let i = 0; i < 300; i++) {
+    const isPlatform = Math.random() > 0.4;
+    const date = randomDate(past60Days, now);
+    const user = users[Math.floor(Math.random() * users.length)];
+
+    if (isPlatform) {
+      const actions = ["POST_JOB", "ACCEPT_PROPOSAL", "RELEASE_PAYMENT", "BOOST_JOB"];
+      const action = actions[Math.floor(Math.random() * actions.length)];
+      let amount = 0;
+      if (action === "POST_JOB") amount = 10000;
+      else if (action === "BOOST_JOB") amount = 50000;
+      else if (action === "RELEASE_PAYMENT") amount = Math.floor(Math.random() * 5000000) * 0.1;
+      else amount = 15000;
+
+      transactionsData.push({
+        userId: user.id,
+        amount,
+        type: "DEBIT" as any,
+        category: "PLATFORM" as any,
+        action,
+        description: `Platform Fee: ${action}`,
+        createdAt: date
+      });
+    } else {
+      const actions = ["TOPUP", "WITHDRAW", "ESCROW_HOLD", "ESCROW_RELEASE"];
+      const action = actions[Math.floor(Math.random() * actions.length)];
+      const amount = Math.floor(Math.random() * 10000000) + 500000;
+      transactionsData.push({
+        userId: user.id,
+        amount,
+        type: action === "WITHDRAW" || action === "ESCROW_HOLD" ? "DEBIT" as any : "CREDIT" as any,
+        category: "USER" as any,
+        action,
+        description: `User TX: ${action}`,
+        createdAt: date
+      });
+    }
+  }
+
+  // Sort by date ascending to simulate real event stream
+  transactionsData.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  
+  for (const t of transactionsData) {
+     await prisma.transaction.create({ data: t });
+  }
+
+  console.log("DONE! The UI will now shine.");
 }
 
 main()
   .catch((e) => {
-    // eslint-disable-next-line no-console
     console.error(e);
     process.exit(1);
   })

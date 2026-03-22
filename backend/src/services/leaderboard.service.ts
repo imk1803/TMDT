@@ -51,7 +51,7 @@ export async function getLeaderboardTop10() {
           title: true,
           completedJobs: true,
           totalIncome: true,
-          rating: true,
+          avgRating: true,
           onTimeRate: true,
           categories: {
             include: { category: true },
@@ -76,7 +76,7 @@ export async function getLeaderboardTop10() {
     const stats = {
       totalCompletedJobs: toNumber(profile.completedJobs),
       totalEarnings: toNumber(profile.totalIncome),
-      averageRating: toNumber(profile.rating),
+      averageRating: toNumber(profile.avgRating),
       onTimeRate: toNumber(profile.onTimeRate),
     };
     const qualified = meetsQualification(stats);

@@ -1,2 +1,2 @@
-import { support } from "../../../../controllers/admin.controller";
-export default support;
+import { getAllTickets } from "../../../../controllers/support.controller";
+export default getAllTickets;

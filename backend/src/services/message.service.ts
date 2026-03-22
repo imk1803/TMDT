@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma";
+import { createNotification } from "./notification.service";
 
 export async function listMessages(conversationId: string) {
   return prisma.message.findMany({
@@ -96,6 +97,14 @@ export async function createContractMessage(contractId: string, senderId: string
         select: { id: true, name: true, email: true, avatarUrl: true },
       },
     },
+  });
+
+  await createNotification(receiverId, "notification:new_message", {
+    title: `Có tin nhắn mới từ ${message.sender?.name || "đối tác"}`,
+    body: typeof content === "string" ? (content.length > 50 ? content.substring(0, 50) + "..." : content) : "Bạn nhận được tin nhắn mới.",
+    link: `/contracts/${contractId}`,
+    category: "MESSAGE",
+    referenceId: message.id,
   });
 
   return message;
